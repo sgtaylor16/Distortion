@@ -1,4 +1,4 @@
-from scipy.fft import fft
+from scipy.fft import fft, ifft
 import pandas as pd
 from matplotlib.tri import Triangulation
 import matplotlib.pyplot as plt
@@ -75,24 +75,48 @@ class Inlet:
         fig,ax = plt.subplots(figsize = (6,6))
         ax.tricontourf(tris, tempdf[self.valuecol])
         ax.set_aspect('equal')
+
+    def orderselect(fft,order,sumorders:bool=False) -> np.ndarray:
+        """Selects the specified order from the FFT result."""
+        #Check to make sure order is under n/2
+        if order >= len(fft) // 2:
+            raise ValueError("Order must be less than n/2.")
+        redfft = np.zeros(len(fft),dtype=complex)
+        if not sumorders:
+            redfft[order] = fft[order]
+            if order >0:
+                redfft[-order] = fft[-order]
+            return redfft
+        if sumorders:
+            redfft[:order+1] = fft[:order+1]
+            redfft[-order:] = fft[-order:]
+            return redfft
+        else:
+            raise ValueError("sumorders must be a boolean value.")
+
     
-    def calcHarmonic(self,order:int) -> pd.DataFrame:
+    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order and returns a DataFrame with x, y, and value columns."""
         fftvalues = self.fftbyRadius()
         df = pd.DataFrame(index=fftvalues.keys())
-        
+
         theta= self.df[self.thetacol].unique() # Gets the unique theta values from the original dataframe
         # Creates a new dataframe with x, y, and value columns by iterating through the radius and theta values and calculating the corresponding x, y,
         #   and value for each combination of radius and theta
         outdf = pd.DataFrame(columns = ['x','y','value'])
         dflist = []
         for radius in df.index:
-            for angle in theta:
-                x = radius * np.cos(angle)
-                y = radius * np.sin(angle)
-                onefftvalue = self.fftbyRadius()[radius][order]
-                value = np.real(onefftvalue * np.exp(1j * order * angle) / self.ntheta)
-                dflist.append([x, y, radius,angle, value])
+            theta = self.df[self.df[self.radiuscol] == radius][self.thetacol].to_numpy()
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
+
+            #redfit is the array of FFT values for the current radius, with all values set to zero except for the value at the specified order.
+            redfft = Inlet.orderselect(fftvalues[radius], order, sumorders)
+
+            value = ifft(redfft)
+            #value = ifft_matrix(self.ntheta) @ redfft
+
+            dflist.extend(zip(x, y, [radius]*len(theta), theta, np.real(value.flatten())))
         outdf = pd.DataFrame(columns = ['x','y','r','theta','value'],data = dflist)
 
         return outdf
@@ -108,12 +132,12 @@ class Inlet:
 
         return pd.concat([xy, totalorder], axis=1)
     
-    def plotHarmonic(self, order: int, onemode: bool = True) -> None:
+    def plotHarmonic(self, order: int, sumorders: bool = True) -> None:
         """Plots either a specific harmonic or the sum of harmonics up to a specified order."""
-        if onemode:
-            outdf = self.calcHarmonic(order)
+        if sumorders:
+            outdf = self.calcHarmonic(order, sumorders=True)
         else:
-            outdf = self.addHarmonics(order)
+            outdf = self.calcHarmonic(order, sumorders=False)
         tris = Triangulation(outdf['x'], outdf['y'])
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])

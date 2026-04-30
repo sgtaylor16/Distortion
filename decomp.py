@@ -49,31 +49,39 @@ def ifft_matrix(N) -> np.ndarray:
     return W_inv
 
 class Inlet:
-    def __init__(self, df: pd.DataFrame, radiuscol: str,thetacol:str,valuecol: str):
+    def __init__(self, df: pd.DataFrame):
+        """Initializes the Inlet class with a DataFrame containing the necessary columns."""
+        required_columns = ['theta','radius']
+        optional_columns = ['pt','Vradial','Vtheta','Vaxial',"MN"]
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"DataFrame must contain the required column: '{col}'")
         self.df = df
-        self.radiuscol = radiuscol
-        self.thetacol = thetacol
-        self.valuecol = valuecol
-        self.nradius = len(self.df[self.radiuscol].unique())
-        self.ntheta = len(self.df[self.thetacol].unique())
+        self.nradius = len(self.df[].unique())
+        self.ntheta = len(self.df['theta'].unique())
 
-    def fftbyRadius(self) -> dict[int,np.ndarray]:
+    def fftbyRadius(self,valuecol:str) -> dict[int,np.ndarray]:
         """Compute the FFT of the values grouped by radius."""
+        if valuecol not in self.df.columns:
+            raise ValueError(f"DataFrame must contain the specified value column: '{valuecol}'")
         fftvalues = {}
-        for radius in self.df[self.radiuscol].unique():
-            subset = self.df[self.df[self.radiuscol] == radius]
-            values = subset[self.valuecol].to_numpy()
+        for radius in self.df['radius'].unique():
+            subset = self.df[self.df['radius'] == radius]
+            values = subset[valuecol].to_numpy()
             fftvalues[radius] = fft(values)
         return fftvalues
     
-    def plotinlet(self):
-        """Plots the inlet of the instance of the Inlet Class."""
+    def plotinlet(self,valuecol:str):
+        """Plots the inlet of the instance of the Inlet Class for the specified value column."""
+        if valuecol not in self.df.columns:
+            raise ValueError(f"DataFrame must contain the specified value column: '{valuecol}'")
+        
         tempdf = self.df.copy()
-        tempdf['x'] = tempdf[self.radiuscol] * np.cos(tempdf[self.thetacol])
-        tempdf['y'] = tempdf[self.radiuscol] * np.sin(tempdf[self.thetacol])
+        tempdf['x'] = tempdf['radius'] * np.cos(tempdf['theta'])
+        tempdf['y'] = tempdf['radius'] * np.sin(tempdf['theta'])
         tris = Triangulation(tempdf['x'], tempdf['y'])
         fig,ax = plt.subplots(figsize = (6,6))
-        ax.tricontourf(tris, tempdf[self.valuecol])
+        ax.tricontourf(tris, tempdf[valuecol])
         ax.set_aspect('equal')
 
     def orderselect(fft,order,sumorders:bool=False) -> np.ndarray:
@@ -94,19 +102,20 @@ class Inlet:
         else:
             raise ValueError("sumorders must be a boolean value.")
 
-    
-    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
+    def calcHarmonic(self,order:int,valuecol:str,sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order and returns a DataFrame with x, y, and value columns."""
-        fftvalues = self.fftbyRadius()
+        if valuecol not in self.df.columns:
+            raise ValueError(f"DataFrame must contain the specified value column: '{valuecol}'")
+        fftvalues = self.fftbyRadius(valuecol)
         df = pd.DataFrame(index=fftvalues.keys())
 
-        theta= self.df[self.thetacol].unique() # Gets the unique theta values from the original dataframe
+        theta= self.df['theta'].unique() # Gets the unique theta values from the original dataframe
         # Creates a new dataframe with x, y, and value columns by iterating through the radius and theta values and calculating the corresponding x, y,
         #   and value for each combination of radius and theta
         outdf = pd.DataFrame(columns = ['x','y','value'])
         dflist = []
         for radius in df.index:
-            theta = self.df[self.df[self.radiuscol] == radius][self.thetacol].to_numpy()
+            theta = self.df[self.df['radius'] == radius]['theta'].to_numpy()
             x = radius * np.cos(theta)
             y = radius * np.sin(theta)
 
@@ -121,33 +130,22 @@ class Inlet:
 
         return outdf
     
-    def addHarmonics(self, maxorder: int) -> pd.DataFrame:
-        """Calculate the sum of harmonics up to a specified order."""
-        for i in range(maxorder + 1):
-            if i == 0:
-                totalorder = self.calcHarmonic(0)['value']
-                xy = self.calcHarmonic(0).iloc[:,0:2]
-            else:
-                totalorder = totalorder + self.calcHarmonic(i)['value']
-
-        return pd.concat([xy, totalorder], axis=1)
-    
-    def plotHarmonic(self, order: int, sumorders: bool = True) -> None:
+    def plotHarmonic(self, order: int, valuecol: str, sumorders: bool = True) -> None:
         """Plots either a specific harmonic or the sum of harmonics up to a specified order."""
         if sumorders:
-            outdf = self.calcHarmonic(order, sumorders=True)
+            outdf = self.calcHarmonic(order, valuecol, sumorders=True)
         else:
-            outdf = self.calcHarmonic(order, sumorders=False)
+            outdf = self.calcHarmonic(order, valuecol, sumorders=False)
         tris = Triangulation(outdf['x'], outdf['y'])
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
         return None
     
-    def convergence(self,maxorder:int) -> float:
+    def convergence(self,maxorder:int, valuecol: str) -> float:
         """Calculates the convergence of the sum of harmonics up to a specified order."""
-        totalorder = self.addHarmonics(maxorder)['value'].to_numpy()
-        original = self.df[self.valuecol].to_numpy()
+        totalorder = self.addHarmonics(maxorder, valuecol)['value'].to_numpy()
+        original = self.df[valuecol].to_numpy()
         return np.linalg.norm(original - totalorder) / np.linalg.norm(original)
 
     
@@ -157,6 +155,8 @@ class InletSet:
     
     def addInlet(self, inlet: Inlet) -> None:
         self.inletlist.append(inlet)
+
+    
 
     #def modeArray(self,order: int):
     #   modearray = np.zeros()

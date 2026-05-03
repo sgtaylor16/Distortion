@@ -57,7 +57,7 @@ class Inlet:
             if col not in df.columns:
                 raise ValueError(f"DataFrame must contain the required column: '{col}'")
         self.df = df
-        self.nradius = len(self.df[].unique())
+        self.nradius = len(self.df['radius'].unique())
         self.ntheta = len(self.df['theta'].unique())
 
     def fftbyRadius(self,valuecol:str) -> dict[int,np.ndarray]:
@@ -141,6 +141,40 @@ class Inlet:
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
         return None
+
+    def plotInletAndHarmonics(self, valuecol: str) -> None:
+        """Plot original inlet data and harmonic orders 0-3 in a horizontal 5-panel layout."""
+        if valuecol not in self.df.columns:
+            raise ValueError(f"DataFrame must contain the specified value column: '{valuecol}'")
+
+        inletdf = self.df.copy()
+        inletdf['x'] = inletdf['radius'] * np.cos(inletdf['theta'])
+        inletdf['y'] = inletdf['radius'] * np.sin(inletdf['theta'])
+
+        harmonic_dfs = [self.calcHarmonic(order, valuecol, sumorders=False) for order in range(4)]
+        value_arrays = [inletdf[valuecol].to_numpy()] + [hdf['value'].to_numpy() for hdf in harmonic_dfs]
+        vmin = min(np.min(vals) for vals in value_arrays)
+        vmax = max(np.max(vals) for vals in value_arrays)
+
+        fig, axes = plt.subplots(1, 5, figsize=(22, 5), constrained_layout=True)
+
+        inlet_tris = Triangulation(inletdf['x'], inletdf['y'])
+        contour = axes[0].tricontourf(inlet_tris, inletdf[valuecol], levels=30, vmin=vmin, vmax=vmax)
+        axes[0].set_title(f"Inlet: {valuecol}")
+        axes[0].set_aspect('equal')
+
+        for order, outdf in enumerate(harmonic_dfs, start=0):
+            tris = Triangulation(outdf['x'], outdf['y'])
+            axes[order + 1].tricontourf(tris, outdf['value'], levels=30, vmin=vmin, vmax=vmax)
+            axes[order + 1].set_title(f"Order {order}")
+            axes[order + 1].set_aspect('equal')
+
+        for ax in axes:
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+
+        fig.colorbar(contour, ax=axes, shrink=0.85, label=valuecol)
+        return None
     
     def convergence(self,maxorder:int, valuecol: str) -> float:
         """Calculates the convergence of the sum of harmonics up to a specified order."""
@@ -156,12 +190,9 @@ class InletSet:
     def addInlet(self, inlet: Inlet) -> None:
         self.inletlist.append(inlet)
 
+    def plot_inlets(self, valuecol: str) -> None:
+        for inlet in self.inletlist:
+            templist1 = self.
+
     
-
-    #def modeArray(self,order: int):
-    #   modearray = np.zeros()
-     #   for oneinlet in self.inletlist:
-
-
-
             

@@ -15,14 +15,35 @@ def dfcheck(df:pd.DataFrame) -> bool:
 
 def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     """
-    Find the rings of concentric measurements in an inlet plane
+    Split inlet measurements into concentric rings by grouping nearby r values.
+
+    Rows are first ordered by r. A new ring is started whenever the current row's
+    r differs from the previous row's r by more than tolerance.
     """
     if not dfcheck(data):
         raise ValueError("DataFrame does not have the required columns.")
-    rmax = data['r'].max()
-    tol = rmax * tolerance
-    
-    
+    if tolerance < 0:
+        raise ValueError("tolerance must be non-negative.")
+
+    if data.empty:
+        return []
+
+    sorted_data = data.sort_values(by='r').reset_index(drop=True)
+    rings = []
+
+    start_idx = 0
+    prev_r = float(sorted_data.loc[0, 'r'])
+    for i in range(1, len(sorted_data)):
+        current_r = float(sorted_data.loc[i, 'r'])
+        if abs(current_r - prev_r) > tolerance:
+            ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True)
+            rings.append(ring_df)
+            start_idx = i
+        prev_r = current_r
+
+    # Add the final ring.
+    rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True))
+    return rings
 
 def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     """
@@ -70,7 +91,7 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         if segment.empty:
             continue
-        if segment['p'].iloc[0] < pavg:
+        if segment['p'].mean() < pavg:
             segments.append(segment)
     return segments
 

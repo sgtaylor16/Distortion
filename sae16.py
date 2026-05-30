@@ -95,7 +95,18 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             segments.append(segment)
     return segments
 
-#def calculate_area(segment:pd.DataFrame,pavg:float) -> float:
+def area_bar(segment:pd.DataFrame,pavg:float) -> float:
+    """
+    Calculate the area of the segment below pavg using the trapezoidal rule.
+    Assumes that the segment is ordered by 'theta'.
+    """
+    if segment.empty:
+        return 0.0
+    # Subtract pavg from p to get the area below pavg.
+    y = segment['p'] - pavg
+    x = segment['theta']
+    area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
+    return max(0.0, -area)  # Area should be positive, so take negative of the result.
 
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):

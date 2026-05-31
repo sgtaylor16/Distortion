@@ -159,6 +159,16 @@ def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
     return max(0.0, -area)  # Area should be positive, so take negative of the result.
 
+class Segment:
+    def __init__(self,segmentdata:pd.DataFrame,pavg:float):
+        self.segmentdata = segmentdata
+        self.pavg = pavg
+        self.area_bar = area_bar(segmentdata,pavg)
+        if (self.segmentdata.iloc[0]['theta'] < .01) and (self.segmentdata.iloc[-1]['theta'] > 359.99):
+            self.extent = (360 - self.segmentdata.iloc[-1]['theta']) + self.segmentdata.iloc[0]['theta']
+        else:
+            self.extent = self.segmentdata['theta'].max() - self.segmentdata['theta'].min()
+
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
 
@@ -170,8 +180,19 @@ class Ring:
             raise ValueError("Ring data must contain 'theta' column.")
         self.ringdata = ringdata
 
+        # Find Segments
+        self.pavg = self.ringdata['p'].mean()
+        zerosements = findnegative_segments(ringdata,self.pavg)
+        self.segments = [Segment(seg, self.pavg) for seg in zerosements]
+
     def PAV(self) -> float:
         return self.ringdata['p'].mean()
+    
+    def extents(self) -> List[float]:
+        pavg = self.PAV()
+        zero_crossings = findzero_crossing(self.ringdata,pavg)
+        zero_segments = findnegative_segments(self.ringdata,pavg)
+
     
     def CDI(self) -> float:
         #Find the regions of the ring where p is below the average value
@@ -180,43 +201,31 @@ class Ring:
         zero_crossings = findzero_crossing(self.ringdata,pavg)
         if len(zero_crossings) < 2:
             raise ValueError("Not enough zero crossings to define segments.")
-        zero_segments = findnegative_segments(self.ringdata,pavg)
+        zero_segments = findnegative_segments_split_wrap(self.ringdata,pavg)
 
-        #Interpolate the zero crossings to find the exact points where p crosses pavg
-        zero_crossings_interp = []
-        for i in range(len(zero_crossings)-1):
-            x0 = self.ringdata['theta'].iloc[zero_crossings[i]]
-            x1 = self.ringdata['theta'].iloc[zero_crossings[i]+1]
-            y0 = self.ringdata['p'].iloc[zero_crossings[i]] - pavg
-            y1 = self.ringdata['p'].iloc[zero_crossings[i]+1] - pavg
-            if y0 * y1 > 0:
-                continue
-            zero_crossing_interp = x0 - y0 * (x1 - x0) / (y1 - y0)
-            zero_crossings_interp.append(zero_crossing_interp)
-        zero_crossings_interp = np.array(zero_crossings_interp)
-
-
-        for i in range(len(zero_crossings)-1):
-            left = zero_crossings[i]
-            right = zero_crossings[i+1]
-            segment = self.ringdata.iloc[left:right+1]
-            if segment['p'].iloc[0] < pavg:
-                segments.append(segment)
-        if len(segments) == 0:
+        if len(zero_segments) == 0:
             return 0.0
-        areas = []
+    
+        elif len(zero_segments) == 1:
+            pavlow = area_bar(zero_segments[0],pavg)
+
+            return (pavg - pavlow) / pavg
     
     
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face."""
 
-    def __init__(self,rings:List[Ring]):
-        self.rings = rings
+    def __init__(self,datadf:pd.DataFrame,tolerance=0.05):
+        ringsegments = findrings(datadf,tolerance)
+        self.rings = [Ring(ringdata) for ringdata in ringsegments]
 
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
 
     def RDI(self,i) -> float:
         return (self.PFAV() - self.rings[i].PAV()) / self.PFAV()
+    
+    def CDI(self,i) -> float:
+        return self.rings[i].CDI()
     
     

@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import List
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def dfcheck(df:pd.DataFrame) -> bool:
@@ -36,13 +37,13 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     for i in range(1, len(sorted_data)):
         current_r = float(sorted_data.loc[i, 'r'])
         if abs(current_r - prev_r) > tolerance:
-            ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True)
+            ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True).sort_values(by='theta')
             rings.append(ring_df)
             start_idx = i
         prev_r = current_r
 
     # Add the final ring.
-    rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True))
+    rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta'))
     return rings
 
 def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
@@ -210,6 +211,14 @@ class Ring:
             pavlow = area_bar(zero_segments[0],pavg)
 
             return (pavg - pavlow) / pavg
+        
+    def plotring(self):
+        fig, ax = plt.subplots()
+        ax.plot(self.ringdata['theta'], self.ringdata['p'], label='Pressure')
+        ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
+        ax.set_xlabel('Theta (degrees)')
+        ax.set_ylabel('Pressure')
+
     
     
 class Face:

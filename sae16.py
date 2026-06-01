@@ -37,13 +37,13 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     for i in range(1, len(sorted_data)):
         current_r = float(sorted_data.loc[i, 'r'])
         if abs(current_r - prev_r) > tolerance:
-            ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True).sort_values(by='theta')
+            ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True)
             rings.append(ring_df)
             start_idx = i
         prev_r = current_r
 
     # Add the final ring.
-    rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta'))
+    rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True))
     return rings
 
 def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
@@ -158,7 +158,7 @@ def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     y = segment['p'] - pavg
     x = segment['theta']
     area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
-    return max(0.0, -area)  # Area should be positive, so take negative of the result.
+    return max(0.0, area + pavg)  # Area should be positive, so take negative of the result.
 
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,pavg:float):

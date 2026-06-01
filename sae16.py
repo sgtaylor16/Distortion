@@ -86,9 +86,13 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         else:
             # Circular interval that spans the end and beginning of theta.
-            segment = data[(data['theta'] >= left) | (data['theta'] <= right)]
+            leftpart = data[data['theta'] >= left].copy()
+            rightpart = data[data['theta'] <= right].copy()
+            # Add 360 to the left part to handle the wrap-around correctly when concatenating.
+            rightpart['theta'] = rightpart['theta'].apply(lambda x: x +360)
+            segment = pd.concat([leftpart, rightpart], ignore_index=True)
             #Add the actual zero crossing points to the segment
-            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], 'p': [pavg, pavg]})], ignore_index=True)
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], 'p': [pavg, pavg]})], ignore_index=True)
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         if segment.empty:
             continue

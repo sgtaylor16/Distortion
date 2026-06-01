@@ -170,6 +170,14 @@ class Segment:
         else:
             self.extent = self.segmentdata['theta'].max() - self.segmentdata['theta'].min()
 
+    def plotsegment(self):
+        fig, ax = plt.subplots()
+        ax.plot(self.segmentdata['theta'], self.segmentdata['p'], label='Pressure')
+        ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
+        ax.set_xlabel('Theta (degrees)')
+        ax.set_ylabel('Pressure')
+
+
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
 

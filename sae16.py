@@ -181,16 +181,10 @@ class Segment:
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
 
-
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
 
-        if "r" not in ringdata.columns:
-            raise ValueError("Ring data must contain 'r' column.")
-        if "p" not in ringdata.columns:
-            raise ValueError("Ring data must contain 'p' column.")
-        if "theta" not in ringdata.columns:
-            raise ValueError("Ring data must contain 'theta' column.")
+        dfcheck(ringdata)
         self.ringdata = ringdata
 
         # Find Segments
@@ -214,7 +208,7 @@ class Ring:
         zero_crossings = findzero_crossing(self.ringdata,pavg)
         if len(zero_crossings) < 2:
             raise ValueError("Not enough zero crossings to define segments.")
-        zero_segments = findnegative_segments_split_wrap(self.ringdata,pavg)
+        zero_segments = findnegative_segments(self.ringdata,pavg)
 
         if len(zero_segments) == 0:
             return 0.0
@@ -231,8 +225,6 @@ class Ring:
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
 
-    
-    
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face."""
 

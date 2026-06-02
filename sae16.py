@@ -171,8 +171,12 @@ class Segment:
         self.area_bar = area_bar(segmentdata,pavg)
         if (self.segmentdata.iloc[0]['theta'] < .01) and (self.segmentdata.iloc[-1]['theta'] > 359.99):
             self.extent = (360 - self.segmentdata.iloc[-1]['theta']) + self.segmentdata.iloc[0]['theta']
+            self.start = self.segmentdata.iloc[-1]['theta']
+            self.end = self.segmentdata.iloc[0]['theta']
         else:
             self.extent = self.segmentdata['theta'].max() - self.segmentdata['theta'].min()
+            self.start = self.segmentdata['theta'].min()
+            self.end = self.segmentdata['theta'].max()
 
     def plotsegment(self):
         fig, ax = plt.subplots()
@@ -195,10 +199,13 @@ class Ring:
     def PAV(self) -> float:
         return self.ringdata['p'].mean()
     
-    def extents(self) -> List[float]:
+    def extents(self,critangle:float = 25.0) -> List[float]:
         pavg = self.PAV()
-        zero_crossings = findzero_crossing(self.ringdata,pavg)
-        zero_segments = findnegative_segments(self.ringdata,pavg)
+        if len(self.segments) == 1:
+            return [self.segments[0].extent]
+        elif len(self.segments) > 1:
+             pass
+
 
     
     def CDI(self) -> float:

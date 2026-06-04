@@ -164,6 +164,12 @@ def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
     return max(0.0, area + pavg)  # Area should be positive, so take negative of the result.
 
+def proximity_test(segment1, segment2, critangle:float) -> bool:
+    if segment2.start - segment1.end < critangle:
+        return True
+    else:
+        return False
+
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,pavg:float):
         self.segmentdata = segmentdata
@@ -193,8 +199,9 @@ class Ring:
 
         # Find Segments
         self.pavg = self.ringdata['p'].mean()
-        zerosements = findnegative_segments(ringdata,self.pavg)
-        self.segments = [Segment(seg, self.pavg) for seg in zerosements]
+        zerosegments = findnegative_segments(ringdata,self.pavg)
+        # Sort segments by their starting theta value for consistent ordering.
+        self.segments = sorted([Segment(seg, self.pavg) for seg in zerosegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
         return self.ringdata['p'].mean()
@@ -205,10 +212,29 @@ class Ring:
             return [self.segments[0].extent]
         elif len(self.segments) > 1:
              pass
+        
+    def _groupedsegments_(self,critangle:float = 0.25):
+        areas = [x.area_bar for x in self.segments]
+        adjacency = [-1 for _ in self.segments]
+        extentlist= [-1 for _ in self.segments]
+        for i in range(len(self.segments)):
+            if i ==0:
+                adjacency[i] = 0
+                extentlist[i] = self.segments[i].end - self.segments[i].start
+            else:
+                if proximity_test(self.segments[i-1], self.segments[i], critangle):
+                    adjacency[i] = adjacency[i-1]
+                    extentlist[i] = extentlist[i-1] + self.segments[i].end - self.segments[i].start
+                else:
+                    adjacency[i] = adjacency[i-1] + 1
+                    extentlist[i] = self.segments[i].end - self.segments[i].start
+        areadf = pd.DataFrame({'area': areas, 'adjacency': adjacency})
+        extentdf = pd.DataFrame({'extent': extentlist, 'adjacency': adjacency})
+        maxextent = extentdf.groupby('adjacency')['extent'].max().to_list()
+        summedareas = areadf.groupby('adjacency')['area'].sum().to_list()
+        return summedareas, maxextent
 
-
-    
-    def CDI(self) -> float:
+    def CDI(self,critangle:float = 25.0) -> float:
         #Find the regions of the ring where p is below the average value
         pavg = self.PAV()
         #Find the zero crossings of p - pavg
@@ -225,6 +251,10 @@ class Ring:
 
             return (pavg - pavlow) / pavg
         
+        else:
+            summedareas,maxextent = self._groupedsegments_(critangle)
+            return None
+
     def plotring(self):
         fig, ax = plt.subplots()
         ax.plot(self.ringdata['theta'], self.ringdata['p'], label='Pressure')

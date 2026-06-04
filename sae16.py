@@ -213,10 +213,10 @@ class Ring:
         elif len(self.segments) > 1:
              pass
         
-    def _groupedsegments_(self,critangle:float = 0.25):
+    def blah(self,critangle:float = 0.25):
         areas = [x.area_bar for x in self.segments]
-        adjacency = [-1 for _ in self.segments]
-        extentlist= [-1 for _ in self.segments]
+        adjacency = [-1 for _ in self.segments] #Init adjacency list with -1 to indicate unassigned segments
+        extentlist= [-1 for _ in self.segments] #Init extent list with -1 to indicate unassigned segments
         for i in range(len(self.segments)):
             if i ==0:
                 adjacency[i] = 0
@@ -232,8 +232,25 @@ class Ring:
         extentdf = pd.DataFrame({'extent': extentlist, 'adjacency': adjacency})
         maxextent = extentdf.groupby('adjacency')['extent'].max().to_list()
         summedareas = areadf.groupby('adjacency')['area'].sum().to_list()
-        return summedareas, maxextent
+        return adjacency
 
+    def adjacency(self,critangle:float = 25.0) -> dict:
+        """
+        Create an adjacency list that groups segments together if they are within critangle degrees of each other.
+        Returns a dictionary where the keys are the adjacency group identifiers and the values are lists of segment indices that belong to each group.
+        """
+        adjacency = [-1 for _ in self.segments] #Init adjacency list with -1 to indicate unassigned segments
+        for i in range(len(self.segments)):
+            if i ==0:
+                adjacency[i] = 0
+            else:
+                if proximity_test(self.segments[i-1], self.segments[i], critangle):
+                    adjacency[i] = adjacency[i-1]
+                else:
+                    adjacency[i] = adjacency[i-1] + 1
+        
+        return {key: [i for i, val in enumerate(adjacency) if val == key] for key in set(adjacency)}
+    
     def CDI(self,critangle:float = 25.0) -> float:
         #Find the regions of the ring where p is below the average value
         pavg = self.PAV()
@@ -251,9 +268,28 @@ class Ring:
         
             return (pavg - pavlow) / pavg
         
-        else:
-            summedareas,maxextent = self._groupedsegments_(critangle)
-            return None
+        else: #More than one segment
+            adjacency = self.adjacency(critangle)
+            grouplist = []
+            for key, segment_indices in adjacency.items():
+                weightedCDI, extentsum = self.grouped_CDI(segment_indices)
+                grouplist.append((weightedCDI, extentsum))
+
+            df = pd.DataFrame(grouplist, columns=['Weighted CDI', 'Extent'])
+            df['CDI'] = df['Weighted CDI'] / df['Extent']
+            max_weighted_idx = df['Weighted CDI'].idxmax()
+            return float(df.loc[max_weighted_idx, 'CDI'])
+
+    def grouped_CDI(self,segmentlist: List[int]) -> float:
+        weightedCDI = 0.0
+        extentsum = 0.0
+        for segment_index in segmentlist:
+            cdi = (self.pavg - self.segments[segment_index].area_bar) / self.pavg
+            weightedCDI += cdi* self.segments[segment_index].extent
+            extentsum += self.segments[segment_index].extent
+        return weightedCDI, extentsum
+    
+    #def select_max_theta()
 
     def plotring(self):
         fig, ax = plt.subplots()

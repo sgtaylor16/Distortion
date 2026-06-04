@@ -247,8 +247,8 @@ class Ring:
             return 0.0
     
         elif len(zero_segments) == 1:
-            pavlow = area_bar(zero_segments[0],pavg)
-
+            pavlow = zero_segments[0].area_bar(pavg)
+        
             return (pavg - pavlow) / pavg
         
         else:

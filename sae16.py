@@ -260,11 +260,11 @@ class Ring:
             raise ValueError("Not enough zero crossings to define segments.")
         zero_segments = findnegative_segments(self.ringdata,pavg)
 
-        if len(zero_segments) == 0:
+        if len(self.segments) == 0:
             return 0.0
     
-        elif len(zero_segments) == 1:
-            pavlow = zero_segments[0].area_bar(pavg)
+        elif len(self.segments) == 1:
+            pavlow = self.segments[0].area_bar
         
             return (pavg - pavlow) / pavg
         
@@ -311,7 +311,8 @@ class Face:
     def RDI(self,i) -> float:
         return (self.PFAV() - self.rings[i].PAV()) / self.PFAV()
     
-    def CDI(self,i) -> float:
-        return self.rings[i].CDI()
+    def CDI(self,i,critangle:float = 25.0) -> float:
+        return self.rings[i].CDI(critangle)
+    
     
     

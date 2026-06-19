@@ -369,13 +369,14 @@ class Ring:
     
     #def select_max_theta()
 
-    def plotring(self):
+    def plotring(self) -> plt.axes:
         fig, ax = plt.subplots()
         ax.plot(self.ringdata['theta'], self.ringdata['p'], label='Pressure')
         ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
-
+        return ax
+    
     def fft(self):
         p = self.ringdata['p'].to_numpy()
         return fft(p)
@@ -425,7 +426,7 @@ class Face:
     def CDI(self,i,critangle:float = 25.0) -> float:
         return self.rings[i].CDI(critangle)
     
-    def plotFace(self,includepts:bool=False) -> None:
+    def plotFace(self,includepts:bool=False) -> plt.axes:
         fig, ax = plt.subplots(figsize=(6, 6))
         tris = Triangulation(self.df['r'] * np.cos(self.df['theta']), self.df['r'] * np.sin(self.df['theta']))
         ax.tricontourf(tris, self.df['p'])
@@ -434,7 +435,7 @@ class Face:
                     self.df['r'] * np.sin(self.df['theta']),
                     'ko', markersize=2)
         ax.set_aspect('equal')
-        return None
+        return ax
 
     def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r and value columns."""
@@ -446,14 +447,14 @@ class Face:
                 harmonics_by_ring = pd.concat([harmonics_by_ring, ring_harmonic], ignore_index=True)
         return harmonics_by_ring
     
-    def plotHarmonic(self, order: int, sumorders: bool = True) -> None:
+    def plotHarmonic(self, order: int, sumorders: bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
         outdf = self.calcHarmonic(order, sumorders=sumorders)
         tris = Triangulation(outdf['x'], outdf['y'])
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
-        return None
+        return ax
     
     def resample_theta(self, n:int) -> 'Face':
         """Resample each ring to n points and return a new Face object with the resampled data."""
@@ -498,4 +499,8 @@ class Face:
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data)
+    
+    def resample(self, r_n: int, theta_n: int) -> 'Face':
+        """Resample the face to r_n rings and theta_n points per ring, returning a new Face object with the resampled data."""
+        return self.resample_r(r_n).resample_theta(theta_n)
 

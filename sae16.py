@@ -222,6 +222,31 @@ def interpfit_fft(x, n, dim=None):
 
     return resample(values, n, axis=axis)
 
+def centers_of_equal_area(outer_radius:float, inner_radius:float, num_rings:int) -> List[float]:
+    """
+    Calculate the center radii of num_rings concentric rings that have equal area between inner_radius and outer_radius.
+    """
+    if num_rings < 1:
+        raise ValueError("num_rings must be a positive integer.")
+    if inner_radius < 0 or outer_radius <= inner_radius:
+        raise ValueError("Radii must satisfy 0 <= inner_radius < outer_radius.")
+
+    total_area = np.pi * (outer_radius**2 - inner_radius**2)
+    area_per_ring = total_area / num_rings
+    center_radii = []
+    
+    for i in range(num_rings):
+        ring_inner_area = area_per_ring * i
+        ring_outer_area = area_per_ring * (i + 1)
+        
+        ring_inner_radius = np.sqrt(inner_radius**2 + ring_inner_area / np.pi)
+        ring_outer_radius = np.sqrt(inner_radius**2 + ring_outer_area / np.pi)
+        
+        center_radius = (ring_inner_radius + ring_outer_radius) / 2
+        center_radii.append(center_radius)
+    
+    return center_radii
+
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,pavg:float):
         self.segmentdata = segmentdata
@@ -440,3 +465,4 @@ class Face:
         return Face(resampled_data)
     
     def resample_r(r_n: int) -> 'Face':
+

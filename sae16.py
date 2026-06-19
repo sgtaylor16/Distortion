@@ -464,5 +464,38 @@ class Face:
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data)
     
-    def resample_r(r_n: int) -> 'Face':
+    def resample_r(self,r_n: int) -> 'Face':
+        """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data."""
+        outer_radius = self.df['r'].max()
+        inner_radius = self.df['r'].min()
+        center_radii = centers_of_equal_area(outer_radius, inner_radius, r_n)
+
+        sorted_rings = sorted(self.rings, key=lambda ring: ring.ringdata['r'].iloc[0])
+        ring_radii = np.array([ring.ringdata['r'].iloc[0] for ring in sorted_rings])
+
+        resampled_rings = []
+        for center_r in center_radii:
+            idx_above = np.searchsorted(ring_radii, center_r, side='right')
+            idx_below = idx_above - 1
+
+            if idx_below < 0:
+                resampled_rings.append(sorted_rings[0].ringdata.assign(r=center_r))
+            elif idx_above >= len(sorted_rings):
+                resampled_rings.append(sorted_rings[-1].ringdata.assign(r=center_r))
+            else:
+                ring_below = sorted_rings[idx_below]
+                ring_above = sorted_rings[idx_above]
+                r_below = ring_radii[idx_below]
+                r_above = ring_radii[idx_above]
+                t = (center_r - r_below) / (r_above - r_below)
+
+                thetas = ring_below.ringdata['theta'].values
+                p_below = ring_below.ringdata['p'].values
+                p_above = ring_above.ringdata['p'].values
+                p_interp = (1 - t) * p_below + t * p_above
+
+                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'p': p_interp}))
+
+        resampled_data = pd.concat(resampled_rings, ignore_index=True)
+        return Face(resampled_data)
 

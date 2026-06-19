@@ -423,9 +423,17 @@ class Face:
     def RDI(self,i) -> float:
         return (self.PFAV() - self.rings[i].PAV()) / self.PFAV()
     
+    def RDImax(self) -> float:
+        rings_RDI = [self.RDI(i) for i in range(len(self.rings))]
+        return max(rings_RDI)
+    
     def CDI(self,i,critangle:float = 25.0) -> float:
         return self.rings[i].CDI(critangle)
     
+    def CDImax(self,critangle:float = 25.0) -> float:
+        rings_CDI = [self.CDI(i,critangle) for i in range(len(self.rings))]
+        return max(rings_CDI)
+
     def plotFace(self,includepts:bool=False) -> plt.axes:
         fig, ax = plt.subplots(figsize=(6, 6))
         tris = Triangulation(self.df['r'] * np.cos(self.df['theta']), self.df['r'] * np.sin(self.df['theta']))

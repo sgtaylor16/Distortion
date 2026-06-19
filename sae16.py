@@ -2,11 +2,15 @@ import pandas as pd
 from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.tri import Triangulation
+from scipy.fft import fft, ifft
+from scipy.signal import resample
 
 
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
+    The required columns are 'r',, 'theta', and 'p'. 
     """
     required_columns = ['r', 'theta', 'p']
     for col in required_columns:
@@ -169,6 +173,54 @@ def proximity_test(segment1, segment2, critangle:float) -> bool:
         return True
     else:
         return False
+    
+def orderselect(fft,order,sumorders:bool=False) -> np.ndarray:
+    """
+    Selects the specified order from the FFT result.
+    if sumorders is True, selects all orders up to and including the specified order.
+    """
+    #Check to make sure order is under n/2
+    if order >= len(fft) // 2:
+        raise ValueError("Order must be less than n/2.")
+    redfft = np.zeros(len(fft),dtype=complex)
+    if not sumorders:
+        redfft[order] = fft[order]
+        return redfft
+    if sumorders:
+        redfft[:order+1] = fft[:order+1]
+        redfft[-order:] = fft[-order:]
+        return redfft
+    else:
+        raise ValueError("sumorders must be a boolean value.")
+    
+def interpfit_fft(x, n, dim=None):
+    """
+    Interpolate periodic data using the FFT method.
+
+    Matches MATLAB's interpft behavior by operating on the first dimension
+    whose size is not 1 when dim is not provided.
+    """
+    values = np.asarray(x)
+    if values.ndim == 0:
+        values = values.reshape(1)
+
+    if not np.isscalar(n):
+        raise ValueError("n must be a scalar positive integer.")
+    n_value = float(n)
+    n = int(n_value)
+    if n < 1 or n != n_value:
+        raise ValueError("n must be a positive integer.")
+
+    if dim is None:
+        axis = next((i for i, size in enumerate(values.shape) if size != 1), 0)
+    else:
+        axis = int(dim)
+        if axis < 0:
+            axis += values.ndim
+        if axis < 0 or axis >= values.ndim:
+            raise ValueError("dim is out of range for the input array.")
+
+    return resample(values, n, axis=axis)
 
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,pavg:float):
@@ -193,6 +245,7 @@ class Segment:
 
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
+        """The ringdata dataframe should have columns 'r', 'theta', and 'p'."""
 
         dfcheck(ringdata)
         self.ringdata = ringdata
@@ -298,12 +351,45 @@ class Ring:
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
 
+    def fft(self):
+        p = self.ringdata['p'].to_numpy()
+        return fft(p)
+    
+    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
+        """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
+        fft_values = self.fft()
+        selected_fft = orderselect(fft_values, order, sumorders)
+        harmonic_value = ifft(selected_fft).real #Do I nead the real?
+        outdf = pd.DataFrame({
+            'x': self.ringdata['r'] * np.cos(self.ringdata['theta']),
+            'y': self.ringdata['r'] * np.sin(self.ringdata['theta']),
+            'r': self.ringdata['r'],
+            'theta': self.ringdata['theta'],
+            'value': harmonic_value
+        })
+        return outdf
+    
+    def resample_df(self, n:int) -> pd.DataFrame:
+        """Uses Scipy.signal's resample function to resample the ring data to n points."""
+        resampled_p = interpfit_fft(self.ringdata['p'], n)
+        resampled_theta = np.linspace(0, 2*np.pi, n, endpoint=False)
+        resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
+        resampled_df = pd.DataFrame({
+            'r': resampled_r,
+            'theta': resampled_theta,
+            'p': resampled_p
+        })
+        return resampled_df
+        
 class Face:
-    """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face."""
+    """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
+    The df expects the following columns: 'r', 'theta', and 'p'.
+    """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05):
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
+        self.df = datadf
 
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
@@ -314,5 +400,43 @@ class Face:
     def CDI(self,i,critangle:float = 25.0) -> float:
         return self.rings[i].CDI(critangle)
     
+    def plotFace(self,includepts:bool=False) -> None:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']), self.df['r'] * np.sin(self.df['theta']))
+        ax.tricontourf(tris, self.df['p'])
+        if includepts:
+            ax.plot(self.df['r'] * np.cos(self.df['theta']),
+                    self.df['r'] * np.sin(self.df['theta']),
+                    'ko', markersize=2)
+        ax.set_aspect('equal')
+        return None
+
+    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
+        """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r and value columns."""
+        for i,ring in enumerate(self.rings):
+            ring_harmonic = ring.calcHarmonic(order, sumorders)
+            if i == 0:
+                harmonics_by_ring = ring_harmonic
+            else:
+                harmonics_by_ring = pd.concat([harmonics_by_ring, ring_harmonic], ignore_index=True)
+        return harmonics_by_ring
     
+    def plotHarmonic(self, order: int, sumorders: bool = True) -> None:
+        """Plot either a specific harmonic or cumulative harmonics up to order."""
+        outdf = self.calcHarmonic(order, sumorders=sumorders)
+        tris = Triangulation(outdf['x'], outdf['y'])
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax.tricontourf(tris, outdf['value'])
+        ax.set_aspect('equal')
+        return None
     
+    def resample_theta(self, n:int) -> 'Face':
+        """Resample each ring to n points and return a new Face object with the resampled data."""
+        resampled_rings = []
+        for ring in self.rings:
+            resampled_df = ring.resample_df(n)
+            resampled_rings.append(resampled_df)
+        resampled_data = pd.concat(resampled_rings, ignore_index=True)
+        return Face(resampled_data)
+    
+    def resample_r(r_n: int) -> 'Face':

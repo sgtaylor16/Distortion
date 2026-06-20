@@ -62,12 +62,22 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
         y0 = data.loc[i, 'p'] - pavg
         y1 = data.loc[i+1, 'p'] - pavg
         if y0 * y1 > 0:
-    # No zero crossing
+        # No zero crossing
             continue
         else:
-    # Linear interpolation to find the exact zero crossing
+        # Linear interpolation to find the exact zero crossing
             zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
             zerocrossings.append(zero_crossing)
+
+    #Check the edge case for wrap-around crossing between the last and first points
+    x0 = data.loc[len(data) - 1, 'theta']
+    x1 = data.loc[0, 'theta'] + 2 * np.pi # Add wrap-around
+    y0 = data.loc[len(data) - 1, 'p'] - pavg
+    y1 = data.loc[0, 'p'] - pavg
+    if y0 * y1 <= 0:
+        zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
+        zero_crossing = zero_crossing % (2*np.pi) # Wrap back to [0, 2*pi]
+        zerocrossings.append(zero_crossing)
     return zerocrossings
 
 def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:

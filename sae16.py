@@ -1,5 +1,6 @@
 import pandas as pd
 from typing import List
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.tri import Triangulation
@@ -16,7 +17,26 @@ def dfcheck(df:pd.DataFrame) -> bool:
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
+    warn_if_theta_looks_radians(df)
     return True
+
+def warn_if_theta_looks_radians(df: pd.DataFrame, tol: float = 1e-6) -> None:
+    """Warn when theta appears to be in radians instead of degrees."""
+    if 'theta' not in df.columns:
+        return
+
+    theta_values = df['theta'].dropna()
+    if theta_values.empty:
+        return
+
+    theta_min = float(theta_values.min())
+    theta_max = float(theta_values.max())
+    if theta_min >= -tol and theta_max <= (2 * np.pi + tol):
+        warnings.warn(
+            "theta appears to be in radians (range 0 to about 2*pi). Expected degrees in [0, 360).",
+            UserWarning,
+            stacklevel=2,
+        )
 
 def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     """
@@ -283,6 +303,7 @@ class Ring:
         """The ringdata dataframe should have columns 'r', 'theta', and 'p'."""
 
         dfcheck(ringdata)
+
         self.ringdata = ringdata
 
         # Find Segments

@@ -300,27 +300,6 @@ class Ring:
             return [self.segments[0].extent]
         elif len(self.segments) > 1:
              pass
-        
-    def blah(self,critangle:float = 0.25):
-        areas = [x.area_bar for x in self.segments]
-        adjacency = [-1 for _ in self.segments] #Init adjacency list with -1 to indicate unassigned segments
-        extentlist= [-1 for _ in self.segments] #Init extent list with -1 to indicate unassigned segments
-        for i in range(len(self.segments)):
-            if i ==0:
-                adjacency[i] = 0
-                extentlist[i] = self.segments[i].end - self.segments[i].start
-            else:
-                if proximity_test(self.segments[i-1], self.segments[i], critangle):
-                    adjacency[i] = adjacency[i-1]
-                    extentlist[i] = extentlist[i-1] + self.segments[i].end - self.segments[i].start
-                else:
-                    adjacency[i] = adjacency[i-1] + 1
-                    extentlist[i] = self.segments[i].end - self.segments[i].start
-        areadf = pd.DataFrame({'area': areas, 'adjacency': adjacency})
-        extentdf = pd.DataFrame({'extent': extentlist, 'adjacency': adjacency})
-        maxextent = extentdf.groupby('adjacency')['extent'].max().to_list()
-        summedareas = areadf.groupby('adjacency')['area'].sum().to_list()
-        return adjacency
 
     def adjacency(self,critangle:float = 25.0) -> dict:
         """

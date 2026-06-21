@@ -71,12 +71,12 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
 
     #Check the edge case for wrap-around crossing between the last and first points
     x0 = data.loc[len(data) - 1, 'theta']
-    x1 = data.loc[0, 'theta'] + 2 * np.pi # Add wrap-around
+    x1 = data.loc[0, 'theta'] + 360 # Add wrap-around
     y0 = data.loc[len(data) - 1, 'p'] - pavg
     y1 = data.loc[0, 'p'] - pavg
     if y0 * y1 <= 0:
         zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
-        zero_crossing = zero_crossing % (2*np.pi) # Wrap back to [0, 2*pi]
+        zero_crossing = zero_crossing % (360) # Wrap back to [0, 360]
         zerocrossings.append(zero_crossing)
     return zerocrossings
 
@@ -399,12 +399,14 @@ class Ring:
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
     The df expects the following columns: 'r', 'theta', and 'p'.
+    theta should be in degrees and should be in the range [0, 360).
     """
 
-    def __init__(self,datadf:pd.DataFrame,tolerance=0.05):
+    def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf
+        self.critangle = critangle
 
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
@@ -416,11 +418,11 @@ class Face:
         rings_RDI = [self.RDI(i) for i in range(len(self.rings))]
         return max(rings_RDI)
     
-    def CDI(self,i,critangle:float = 25.0) -> float:
-        return self.rings[i].CDI(critangle)
+    def CDI(self,i) -> float:
+        return self.rings[i].CDI(self.critangle)
     
-    def CDImax(self,critangle:float = 25.0) -> float:
-        rings_CDI = [self.CDI(i,critangle) for i in range(len(self.rings))]
+    def CDImax(self) -> float:
+        rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
 
     def plotFace(self,includepts:bool=False) -> plt.axes:
@@ -460,7 +462,7 @@ class Face:
             resampled_df = ring.resample_df(n)
             resampled_rings.append(resampled_df)
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
-        return Face(resampled_data)
+        return Face(resampled_data, critangle=self.critangle)
     
     def resample_r(self,r_n: int) -> 'Face':
         """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data."""
@@ -495,7 +497,7 @@ class Face:
                 resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'p': p_interp}))
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
-        return Face(resampled_data)
+        return Face(resampled_data, critangle=self.critangle)
     
     def resample(self, r_n: int, theta_n: int) -> 'Face':
         """Resample the face to r_n rings and theta_n points per ring, returning a new Face object with the resampled data."""

@@ -11,9 +11,9 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r',, 'theta', and 'p'. 
+    The required columns are 'r', 'theta', and 'pt'.
     """
-    required_columns = ['r', 'theta', 'p']
+    required_columns = ['r', 'theta', 'pt','ps']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -73,14 +73,14 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
 def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     """
     Find the points where the data crosses zero. Interpolates between points to find the exact
-    crossing point. Assumes that the data is ordered by 'theta' and that 'p' is the value being analyzed for crossings with respect to pavg.
+    crossing point. Assumes that the data is ordered by 'theta' and that 'pt' is the value being analyzed for crossings with respect to pavg.
     """
     zerocrossings = []
     for i in range(len(data) - 1):
         x0 = data.loc[i, 'theta']
         x1 = data.loc[i+1, 'theta']
-        y0 = data.loc[i, 'p'] - pavg
-        y1 = data.loc[i+1, 'p'] - pavg
+        y0 = data.loc[i, 'pt'] - pavg
+        y1 = data.loc[i+1, 'pt'] - pavg
         if y0 * y1 > 0:
         # No zero crossing
             continue
@@ -92,8 +92,8 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     #Check the edge case for wrap-around crossing between the last and first points
     x0 = data.loc[len(data) - 1, 'theta']
     x1 = data.loc[0, 'theta'] + 360 # Add wrap-around
-    y0 = data.loc[len(data) - 1, 'p'] - pavg
-    y1 = data.loc[0, 'p'] - pavg
+    y0 = data.loc[len(data) - 1, 'pt'] - pavg
+    y1 = data.loc[0, 'pt'] - pavg
     if y0 * y1 <= 0:
         zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
         zero_crossing = zero_crossing % (360) # Wrap back to [0, 360]
@@ -116,7 +116,7 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
         if left <= right:
             segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
             #Add the actual zero crossing points to the segment
-            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], 'p': [pavg, pavg]})], ignore_index=True)
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], 'pt': [pavg, pavg]})], ignore_index=True)
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         else:
             # Circular interval that spans the end and beginning of theta.
@@ -126,11 +126,11 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             rightpart['theta'] = rightpart['theta'].apply(lambda x: x +360)
             segment = pd.concat([leftpart, rightpart], ignore_index=True)
             #Add the actual zero crossing points to the segment
-            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], 'p': [pavg, pavg]})], ignore_index=True)
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], 'pt': [pavg, pavg]})], ignore_index=True)
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         if segment.empty:
             continue
-        if segment['p'].mean() < pavg:
+        if segment['pt'].mean() < pavg:
             segments.append(segment)
     return segments
 
@@ -154,11 +154,11 @@ def findnegative_segments_split_wrap(data:pd.DataFrame,pavg:float) -> List[pd.Da
     for left, right in zip(zero_crossings, zero_crossings[1:]):
         segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
         segment = pd.concat(
-            [segment, pd.DataFrame({'theta': [left, right], 'p': [pavg, pavg]})],
+            [segment, pd.DataFrame({'theta': [left, right], 'pt': [pavg, pavg]})],
             ignore_index=True
         )
         segment = segment.sort_values(by='theta').reset_index(drop=True)
-        if not segment.empty and segment['p'].mean() < pavg:
+        if not segment.empty and segment['pt'].mean() < pavg:
             segments.append(segment)
 
     # Split the wrap-around interval into two non-wrapping segments.
@@ -167,20 +167,20 @@ def findnegative_segments_split_wrap(data:pd.DataFrame,pavg:float) -> List[pd.Da
 
     end_segment = data[data['theta'] >= left]
     end_segment = pd.concat(
-        [end_segment, pd.DataFrame({'theta': [left, theta_max], 'p': [pavg, pavg]})],
+        [end_segment, pd.DataFrame({'theta': [left, theta_max], 'pt': [pavg, pavg]})],
         ignore_index=True
     )
     end_segment = end_segment.sort_values(by='theta').reset_index(drop=True)
-    if not end_segment.empty and end_segment['p'].mean() < pavg:
+    if not end_segment.empty and end_segment['pt'].mean() < pavg:
         segments.append(end_segment)
 
     start_segment = data[data['theta'] <= right]
     start_segment = pd.concat(
-        [start_segment, pd.DataFrame({'theta': [theta_min, right], 'p': [pavg, pavg]})],
+        [start_segment, pd.DataFrame({'theta': [theta_min, right], 'pt': [pavg, pavg]})],
         ignore_index=True
     )
     start_segment = start_segment.sort_values(by='theta').reset_index(drop=True)
-    if not start_segment.empty and start_segment['p'].mean() < pavg:
+    if not start_segment.empty and start_segment['pt'].mean() < pavg:
         segments.append(start_segment)
 
     return segments
@@ -193,7 +193,7 @@ def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     if segment.empty:
         return 0.0
     # Subtract pavg from p to get the area below pavg.
-    y = segment['p'] - pavg
+    y = segment['pt'] - pavg
     x = segment['theta']
     area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
     return max(0.0, area + pavg)  # Area should be positive, so take negative of the result.
@@ -293,27 +293,27 @@ class Segment:
 
     def plotsegment(self):
         fig, ax = plt.subplots()
-        ax.plot(self.segmentdata['theta'], self.segmentdata['p'], label='Pressure')
+        ax.plot(self.segmentdata['theta'], self.segmentdata['pt'], label='Pressure')
         ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
 
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
-        """The ringdata dataframe should have columns 'r', 'theta', and 'p'."""
+        """The ringdata dataframe should have columns 'r', 'theta', and 'pt'."""
 
         dfcheck(ringdata)
 
         self.ringdata = ringdata
 
         # Find Segments
-        self.pavg = self.ringdata['p'].mean()
+        self.pavg = self.ringdata['pt'].mean()
         zerosegments = findnegative_segments(ringdata,self.pavg)
         # Sort segments by their starting theta value for consistent ordering.
         self.segments = sorted([Segment(seg, self.pavg) for seg in zerosegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
-        return self.ringdata['p'].mean()
+        return self.ringdata['pt'].mean()
     
     def extents(self,critangle:float = 25.0) -> List[float]:
         pavg = self.PAV()
@@ -381,14 +381,14 @@ class Ring:
 
     def plotring(self) -> plt.axes:
         fig, ax = plt.subplots()
-        ax.plot(self.ringdata['theta'], self.ringdata['p'], label='Pressure')
+        ax.plot(self.ringdata['theta'], self.ringdata['pt'], label='Pressure')
         ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
         return ax
     
     def fft(self):
-        p = self.ringdata['p'].to_numpy()
+        p = self.ringdata['pt'].to_numpy()
         return fft(p)
     
     def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
@@ -407,27 +407,29 @@ class Ring:
     
     def resample_df(self, n:int) -> pd.DataFrame:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
-        resampled_p = interpfit_fft(self.ringdata['p'], n)
+        resampled_p = interpfit_fft(self.ringdata['pt'], n)
         resampled_theta = np.linspace(0, 2*np.pi, n, endpoint=False)
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
         resampled_df = pd.DataFrame({
             'r': resampled_r,
             'theta': resampled_theta,
-            'p': resampled_p
+            'pt': resampled_p
         })
         return resampled_df
         
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
-    The df expects the following columns: 'r', 'theta', and 'p'.
+    The df expects the following columns: 'r', 'theta', and 'pt'.
     theta should be in degrees and should be in the range [0, 360).
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
+        dfcheck(datadf)
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf
         self.critangle = critangle
+        self.Q = self.df['pt'].mean() - self.df['ps'].mean()
 
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
@@ -445,14 +447,21 @@ class Face:
     def CDImax(self) -> float:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
+    
+    def HEI(self,ring) -> List[float]:
+        """Calculates the Harmonic Energy Index for a specific ring."""
+        fft_values = self.rings[ring].fft()
+        q = self.df['pt'].mean() - self.df['ps'].mean()
+        HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        return HEI_values
 
-    def plotFace(self,includepts:bool=False) -> plt.axes:
+    def plotFace(self,includepts:bool=False,value='pt') -> plt.axes:
         fig, ax = plt.subplots(figsize=(6, 6))
-        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']), self.df['r'] * np.sin(self.df['theta']))
-        ax.tricontourf(tris, self.df['p'])
+        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']*np.pi/180), self.df['r'] * np.sin(self.df['theta']*np.pi/180))
+        ax.tricontourf(tris, self.df[value])
         if includepts:
-            ax.plot(self.df['r'] * np.cos(self.df['theta']),
-                    self.df['r'] * np.sin(self.df['theta']),
+            ax.plot(self.df['r'] * np.cos(self.df['theta']*np.pi/180),
+                    self.df['r'] * np.sin(self.df['theta']*np.pi/180),
                     'ko', markersize=2)
         ax.set_aspect('equal')
         return ax
@@ -511,11 +520,11 @@ class Face:
                 t = (center_r - r_below) / (r_above - r_below)
 
                 thetas = ring_below.ringdata['theta'].values
-                p_below = ring_below.ringdata['p'].values
-                p_above = ring_above.ringdata['p'].values
+                p_below = ring_below.ringdata['pt'].values
+                p_above = ring_above.ringdata['pt'].values
                 p_interp = (1 - t) * p_below + t * p_above
 
-                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'p': p_interp}))
+                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'pt': p_interp}))
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)

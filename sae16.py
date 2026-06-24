@@ -13,7 +13,7 @@ def dfcheck(df:pd.DataFrame) -> bool:
     Check if the dataframe has the required columns for SAE16 calculations.
     The required columns are 'r', 'theta', and 'pt'.
     """
-    required_columns = ['r', 'theta', 'pt']
+    required_columns = ['r', 'theta', 'pt','ps']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -429,6 +429,7 @@ class Face:
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf
         self.critangle = critangle
+        self.Q = self.df['pt'].mean() - self.df['ps'].mean()
 
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
@@ -446,14 +447,21 @@ class Face:
     def CDImax(self) -> float:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
+    
+    def HEI(self,ring) -> List[float]:
+        """Calculates the Harmonic Energy Index for a specific ring."""
+        fft_values = self.rings[ring].fft()
+        q = self.df['pt'].mean() - self.df['ps'].mean()
+        HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        return HEI_values
 
     def plotFace(self,includepts:bool=False,value='pt') -> plt.axes:
         fig, ax = plt.subplots(figsize=(6, 6))
-        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']), self.df['r'] * np.sin(self.df['theta']))
+        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']*np.pi/180), self.df['r'] * np.sin(self.df['theta']*np.pi/180))
         ax.tricontourf(tris, self.df[value])
         if includepts:
-            ax.plot(self.df['r'] * np.cos(self.df['theta']),
-                    self.df['r'] * np.sin(self.df['theta']),
+            ax.plot(self.df['r'] * np.cos(self.df['theta']*np.pi/180),
+                    self.df['r'] * np.sin(self.df['theta']*np.pi/180),
                     'ko', markersize=2)
         ax.set_aspect('equal')
         return ax

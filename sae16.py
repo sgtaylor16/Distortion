@@ -407,13 +407,15 @@ class Ring:
     
     def resample_df(self, n:int) -> pd.DataFrame:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
-        resampled_p = interpfit_fft(self.ringdata['pt'], n)
-        resampled_theta = np.linspace(0, 2*np.pi, n, endpoint=False)
+        resampled_pt = interpfit_fft(self.ringdata['pt'], n)
+        resampled_ps = interpfit_fft(self.ringdata['ps'], n)
+        resampled_theta = np.linspace(0, 360, n, endpoint=False)
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
         resampled_df = pd.DataFrame({
             'r': resampled_r,
             'theta': resampled_theta,
-            'pt': resampled_p
+            'pt': resampled_pt,
+            'ps': resampled_ps
         })
         return resampled_df
         
@@ -448,7 +450,7 @@ class Face:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
     
-    def HEI(self,ring) -> List[float]:
+    def HEI(self,ring:int) -> List[float]:
         """Calculates the Harmonic Energy Index for a specific ring."""
         fft_values = self.rings[ring].fft()
         q = self.df['pt'].mean() - self.df['ps'].mean()
@@ -520,11 +522,15 @@ class Face:
                 t = (center_r - r_below) / (r_above - r_below)
 
                 thetas = ring_below.ringdata['theta'].values
-                p_below = ring_below.ringdata['pt'].values
-                p_above = ring_above.ringdata['pt'].values
-                p_interp = (1 - t) * p_below + t * p_above
+                pt_below = ring_below.ringdata['pt'].values
+                pt_above = ring_above.ringdata['pt'].values
+                pt_interp = (1 - t) * pt_below + t * pt_above
 
-                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'pt': p_interp}))
+                ps_below = ring_below.ringdata['ps'].values
+                ps_above = ring_above.ringdata['ps'].values
+                ps_interp = (1 - t) * ps_below + t * ps_above
+
+                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'pt': pt_interp, 'ps': ps_interp}))
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)

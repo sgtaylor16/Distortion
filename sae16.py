@@ -410,6 +410,7 @@ class Ring:
         resampled_pt = interpfit_fft(self.ringdata['pt'], n)
         resampled_ps = interpfit_fft(self.ringdata['ps'], n)
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
+        resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
         resampled_df = pd.DataFrame({
             'r': resampled_r,

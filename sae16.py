@@ -11,9 +11,10 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r', 'theta', and 'pt'.
+    The required columns are 'r', 'theta', and 'pt' and swirl. Swirl should be interpreted
+    as the swirl angle.
     """
-    required_columns = ['r', 'theta', 'pt','ps']
+    required_columns = ['r', 'theta', 'pt','ps','swirl']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -298,6 +299,12 @@ class Segment:
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel('Pressure')
 
+    def avgSwirl(self) -> float:
+        """Calculate the average swirl angle for the segment."""
+        dtheta = self.extent / len(self.segmentdata)
+        weighted_swirl = np.sum(self.segmentdata['swirl'] * dtheta)
+        return weighted_swirl / self.extent if self.extent > 0 else 0
+
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
         """The ringdata dataframe should have columns 'r', 'theta', and 'pt'."""
@@ -377,8 +384,6 @@ class Ring:
             extentsum += self.segments[segment_index].extent
         return weightedCDI, extentsum
     
-    #def select_max_theta()
-
     def plotring(self) -> plt.axes:
         fig, ax = plt.subplots()
         ax.plot(self.ringdata['theta'], self.ringdata['pt'], label='Pressure')
@@ -419,7 +424,25 @@ class Ring:
             'ps': resampled_ps
         })
         return resampled_df
-        
+    
+    def swirlintensity(self) -> float:
+        """Calculates the SAE16 swirl intensity metric for the ring."""
+        numerator = 0.0
+        for segment in self.segments:
+            numerator += abs(segment.avgSwirl()) * segment.extent
+        return numerator / 360.0
+    
+    def swirlDirectivity(self) -> float:
+        """Calculates the SAE16 swirl directivity metric for the ring."""
+        numerator = 0.0
+        denominator = 0.0
+        for segment in self.segments:
+            numerator += segment.avgSwirl() * segment.extent
+            denominator += abs(segment.avgSwirl()) * segment.extent
+        if denominator == 0:
+            raise ValueError("Denominator is zero, cannot calculate swirl directivity.")
+        return numerator / denominator
+
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
     The df expects the following columns: 'r', 'theta', and 'pt'.

@@ -101,7 +101,6 @@ def findzero_crossing(data:pd.DataFrame,avg:float,value:str='pt') -> List[float]
         zerocrossings.append(zero_crossing)
     return zerocrossings
 
-
 def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     """
     Find the segments of the data where value is all above or all below the avg value"""
@@ -289,7 +288,7 @@ class Ring:
         #Make sure swirl is not all zero before calculating swirl segments
         if not np.all(self.ringdata['swirl'] == 0):
             swirlsegments = find_segments(ringdata,0,'swirl')
-            self.swirls = sorted([SwirlSegment(seg) for seg in swirlsegments], key=lambda seg: seg.start)
+            self.swirlsegments = sorted([SwirlSegment(seg) for seg in swirlsegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
         return self.ringdata['pt'].mean()
@@ -400,7 +399,7 @@ class Ring:
     def swirlintensity(self) -> float:
         """Calculates the SAE16 swirl intensity metric for the ring."""
         numerator = 0.0
-        for segment in self.segments:
+        for segment in self.swirlsegments:
             numerator += abs(segment.avgSwirl()) * segment.extent
         return numerator / 360.0
     
@@ -408,7 +407,7 @@ class Ring:
         """Calculates the SAE16 swirl directivity metric for the ring."""
         numerator = 0.0
         denominator = 0.0
-        for segment in self.segments:
+        for segment in self.swirlsegments:
             numerator += segment.avgSwirl() * segment.extent
             denominator += abs(segment.avgSwirl()) * segment.extent
         if denominator == 0:
@@ -422,6 +421,9 @@ class Face:
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
+        # Add Swirl if column not already in dataframe, just set it to 0.
+        if 'swirl' not in datadf.columns:
+            datadf['swirl'] = 0.0
         dfcheck(datadf)
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]

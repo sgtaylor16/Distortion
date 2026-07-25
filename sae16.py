@@ -71,7 +71,7 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True))
     return rings
 
-def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
+def findzero_crossing(data:pd.DataFrame,avg:float,value:str='pt') -> List[float]:
     """
     Find the points where the data crosses zero. Interpolates between points to find the exact
     crossing point. Assumes that the data is ordered by 'theta' and that 'pt' is the value being analyzed for crossings with respect to pavg.
@@ -80,8 +80,8 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     for i in range(len(data) - 1):
         x0 = data.loc[i, 'theta']
         x1 = data.loc[i+1, 'theta']
-        y0 = data.loc[i, 'pt'] - pavg
-        y1 = data.loc[i+1, 'pt'] - pavg
+        y0 = data.loc[i, value] - avg
+        y1 = data.loc[i+1, value] - avg
         if y0 * y1 > 0:
         # No zero crossing
             continue
@@ -93,8 +93,8 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     #Check the edge case for wrap-around crossing between the last and first points
     x0 = data.loc[len(data) - 1, 'theta']
     x1 = data.loc[0, 'theta'] + 360 # Add wrap-around
-    y0 = data.loc[len(data) - 1, 'pt'] - pavg
-    y1 = data.loc[0, 'pt'] - pavg
+    y0 = data.loc[len(data) - 1, value] - avg
+    y1 = data.loc[0, value] - avg
     if y0 * y1 <= 0:
         zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
         zero_crossing = zero_crossing % (360) # Wrap back to [0, 360]
@@ -133,6 +133,37 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             continue
         if segment['pt'].mean() < pavg:
             segments.append(segment)
+    return segments
+
+def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
+    """
+    Find the segments of the data where value is all above or all below the avg value"""
+    segments = []
+    zero_crossings = findzero_crossing(data,avg,value)
+    if len(zero_crossings) < 2:
+        raise ValueError("Not enough zero crossings to define segments.")
+    # Evaluate all adjacent crossing pairs plus the wrap-around pair (last -> first).
+    crossing_pairs = list(zip(zero_crossings, zero_crossings[1:]))
+    crossing_pairs.append((zero_crossings[-1], zero_crossings[0]))
+
+    for left, right in crossing_pairs:
+        if left <= right:
+            segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
+            #Add the actual zero crossing points to the segment
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], value: [avg, avg]})], ignore_index=True)
+            segment = segment.sort_values(by='theta').reset_index(drop=True)
+        else:
+            # Circular interval that spans the end and beginning of theta.
+            leftpart = data[data['theta'] >= left].copy()
+            rightpart = data[data['theta'] <= right].copy()
+            # Add 360 to the left part to handle the wrap-around correctly when concatenating.
+            rightpart['theta'] = rightpart['theta'].apply(lambda x: x +360)
+            segment = pd.concat([leftpart, rightpart], ignore_index=True)
+            #Add the actual zero crossing points to the segment
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], value: [avg, avg]})], ignore_index=True)
+            segment = segment.sort_values(by='theta').reset_index(drop=True)
+        if segment.empty:
+            continue
     return segments
 
 def area_bar(segment:pd.DataFrame,pavg:float) -> float:
@@ -256,7 +287,7 @@ class Segment:
 
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
-        """The ringdata dataframe should have columns 'r', 'theta', and 'pt'."""
+        """The ringdata dataframe should have columns 'r', 'theta', and 'pt',"""
 
         dfcheck(ringdata)
 

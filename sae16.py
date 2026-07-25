@@ -135,57 +135,6 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             segments.append(segment)
     return segments
 
-def findnegative_segments_split_wrap(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
-    """
-    Find segments where p is below pavg, but never create a wrapped segment.
-
-    If the interval between two consecutive zero crossings wraps around theta
-    (last crossing -> first crossing), split it into two independent segments:
-    one at the end of theta and one at the beginning.
-    """
-    segments = []
-    zero_crossings = findzero_crossing(data, pavg)
-    if len(zero_crossings) < 2:
-        raise ValueError("Not enough zero crossings to define segments.")
-
-    theta_min = data['theta'].min()
-    theta_max = data['theta'].max()
-
-    # Adjacent, non-wrapping crossing pairs.
-    for left, right in zip(zero_crossings, zero_crossings[1:]):
-        segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
-        segment = pd.concat(
-            [segment, pd.DataFrame({'theta': [left, right], 'pt': [pavg, pavg]})],
-            ignore_index=True
-        )
-        segment = segment.sort_values(by='theta').reset_index(drop=True)
-        if not segment.empty and segment['pt'].mean() < pavg:
-            segments.append(segment)
-
-    # Split the wrap-around interval into two non-wrapping segments.
-    left = zero_crossings[-1]
-    right = zero_crossings[0]
-
-    end_segment = data[data['theta'] >= left]
-    end_segment = pd.concat(
-        [end_segment, pd.DataFrame({'theta': [left, theta_max], 'pt': [pavg, pavg]})],
-        ignore_index=True
-    )
-    end_segment = end_segment.sort_values(by='theta').reset_index(drop=True)
-    if not end_segment.empty and end_segment['pt'].mean() < pavg:
-        segments.append(end_segment)
-
-    start_segment = data[data['theta'] <= right]
-    start_segment = pd.concat(
-        [start_segment, pd.DataFrame({'theta': [theta_min, right], 'pt': [pavg, pavg]})],
-        ignore_index=True
-    )
-    start_segment = start_segment.sort_values(by='theta').reset_index(drop=True)
-    if not start_segment.empty and start_segment['pt'].mean() < pavg:
-        segments.append(start_segment)
-
-    return segments
-
 def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     """
     Calculate the area of the segment below pavg using the trapezoidal rule.

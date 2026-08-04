@@ -447,6 +447,13 @@ class Face:
     def CDImax(self) -> float:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
+
+    def swirlintensity(self,i) -> float:
+        return self.rings[i].swirlintensity()
+
+    def swirlintesitymax(self) -> float:
+        rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
+        return max(rings_swirlintensity)
     
     def HEI(self,ring:int) -> List[float]:
         """Calculates the Harmonic Energy Index for a specific ring."""

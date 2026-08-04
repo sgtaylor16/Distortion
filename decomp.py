@@ -123,7 +123,7 @@ class Inlet:
             redfft = Inlet.orderselect(fftvalues[radius], order, sumorders)
 
             value = ifft(redfft)
-            #value = ifft_matrix(self.ntheta) @ redfft
+
 
             dflist.extend(zip(x, y, [radius]*len(theta), theta, np.real(value.flatten())))
         outdf = pd.DataFrame(columns = ['x','y','r','theta','value'],data = dflist)
@@ -189,10 +189,10 @@ class InletSet:
     
     def addInlet(self, inlet: Inlet) -> None:
         self.inletlist.append(inlet)
-
+'''
     def plot_inlets(self, valuecol: str) -> None:
         for inlet in self.inletlist:
-            templist1 = self.
+        '''  
 
     
             

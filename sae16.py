@@ -11,9 +11,10 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r', 'theta', and 'pt'.
+    The required columns are 'r', 'theta', and 'pt' and swirl. Swirl should be interpreted
+    as the swirl angle.
     """
-    required_columns = ['r', 'theta', 'pt','ps']
+    required_columns = ['r', 'theta', 'pt','ps','swirl']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -70,7 +71,7 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True))
     return rings
 
-def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
+def findzero_crossing(data:pd.DataFrame,avg:float,value:str='pt') -> List[float]:
     """
     Find the points where the data crosses zero. Interpolates between points to find the exact
     crossing point. Assumes that the data is ordered by 'theta' and that 'pt' is the value being analyzed for crossings with respect to pavg.
@@ -79,8 +80,8 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     for i in range(len(data) - 1):
         x0 = data.loc[i, 'theta']
         x1 = data.loc[i+1, 'theta']
-        y0 = data.loc[i, 'pt'] - pavg
-        y1 = data.loc[i+1, 'pt'] - pavg
+        y0 = data.loc[i, value] - avg
+        y1 = data.loc[i+1, value] - avg
         if y0 * y1 > 0:
         # No zero crossing
             continue
@@ -92,20 +93,19 @@ def findzero_crossing(data:pd.DataFrame,pavg:float) -> List[float]:
     #Check the edge case for wrap-around crossing between the last and first points
     x0 = data.loc[len(data) - 1, 'theta']
     x1 = data.loc[0, 'theta'] + 360 # Add wrap-around
-    y0 = data.loc[len(data) - 1, 'pt'] - pavg
-    y1 = data.loc[0, 'pt'] - pavg
+    y0 = data.loc[len(data) - 1, value] - avg
+    y1 = data.loc[0, value] - avg
     if y0 * y1 <= 0:
         zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
         zero_crossing = zero_crossing % (360) # Wrap back to [0, 360]
         zerocrossings.append(zero_crossing)
     return zerocrossings
 
-def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
+def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     """
-    Find the segments of the data where p is below the average value.
-    """
+    Find the segments of the data where value is all above or all below the avg value"""
     segments = []
-    zero_crossings = findzero_crossing(data,pavg)
+    zero_crossings = findzero_crossing(data,avg,value)
     if len(zero_crossings) < 2:
         raise ValueError("Not enough zero crossings to define segments.")
     # Evaluate all adjacent crossing pairs plus the wrap-around pair (last -> first).
@@ -116,7 +116,7 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
         if left <= right:
             segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
             #Add the actual zero crossing points to the segment
-            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], 'pt': [pavg, pavg]})], ignore_index=True)
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right], value: [avg, avg]})], ignore_index=True)
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         else:
             # Circular interval that spans the end and beginning of theta.
@@ -126,66 +126,24 @@ def findnegative_segments(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
             rightpart['theta'] = rightpart['theta'].apply(lambda x: x +360)
             segment = pd.concat([leftpart, rightpart], ignore_index=True)
             #Add the actual zero crossing points to the segment
-            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], 'pt': [pavg, pavg]})], ignore_index=True)
+            segment = pd.concat([segment, pd.DataFrame({'theta': [left, right+360], value: [avg, avg]})], ignore_index=True)
             segment = segment.sort_values(by='theta').reset_index(drop=True)
         if segment.empty:
             continue
-        if segment['pt'].mean() < pavg:
-            segments.append(segment)
-    return segments
-
-def findnegative_segments_split_wrap(data:pd.DataFrame,pavg:float) -> List[pd.DataFrame]:
-    """
-    Find segments where p is below pavg, but never create a wrapped segment.
-
-    If the interval between two consecutive zero crossings wraps around theta
-    (last crossing -> first crossing), split it into two independent segments:
-    one at the end of theta and one at the beginning.
-    """
-    segments = []
-    zero_crossings = findzero_crossing(data, pavg)
-    if len(zero_crossings) < 2:
-        raise ValueError("Not enough zero crossings to define segments.")
-
-    theta_min = data['theta'].min()
-    theta_max = data['theta'].max()
-
-    # Adjacent, non-wrapping crossing pairs.
-    for left, right in zip(zero_crossings, zero_crossings[1:]):
-        segment = data[(data['theta'] >= left) & (data['theta'] <= right)]
-        segment = pd.concat(
-            [segment, pd.DataFrame({'theta': [left, right], 'pt': [pavg, pavg]})],
-            ignore_index=True
-        )
-        segment = segment.sort_values(by='theta').reset_index(drop=True)
-        if not segment.empty and segment['pt'].mean() < pavg:
-            segments.append(segment)
-
-    # Split the wrap-around interval into two non-wrapping segments.
-    left = zero_crossings[-1]
-    right = zero_crossings[0]
-
-    end_segment = data[data['theta'] >= left]
-    end_segment = pd.concat(
-        [end_segment, pd.DataFrame({'theta': [left, theta_max], 'pt': [pavg, pavg]})],
-        ignore_index=True
-    )
-    end_segment = end_segment.sort_values(by='theta').reset_index(drop=True)
-    if not end_segment.empty and end_segment['pt'].mean() < pavg:
-        segments.append(end_segment)
-
-    start_segment = data[data['theta'] <= right]
-    start_segment = pd.concat(
-        [start_segment, pd.DataFrame({'theta': [theta_min, right], 'pt': [pavg, pavg]})],
-        ignore_index=True
-    )
-    start_segment = start_segment.sort_values(by='theta').reset_index(drop=True)
-    if not start_segment.empty and start_segment['pt'].mean() < pavg:
-        segments.append(start_segment)
+        segments.append(segment)
 
     return segments
 
-def area_bar(segment:pd.DataFrame,pavg:float) -> float:
+def findnegative_segments(data:pd.DataFrame,avg:float,value:str='pt') -> List[pd.DataFrame]:
+    """
+    Find the segments of the data where p is below the average value.
+    """
+
+    allsegments = find_segments(data,avg,value)
+ 
+    return [segment for segment in allsegments if segment[value].mean() < avg] #Returns only the segments where the mean value is below the average.
+
+def area_bar(segment:pd.DataFrame,avg:float,value:str='pt') -> float:
     """
     Calculate the area of the segment below pavg using the trapezoidal rule.
     Assumes that the segment is ordered by 'theta'.
@@ -193,10 +151,10 @@ def area_bar(segment:pd.DataFrame,pavg:float) -> float:
     if segment.empty:
         return 0.0
     # Subtract pavg from p to get the area below pavg.
-    y = segment['pt'] - pavg
+    y = segment[value] - avg
     x = segment['theta']
     area = np.trapz(y, x) / (segment['theta'].max() - segment['theta'].min())  # Normalize by the theta range to get an average area.
-    return max(0.0, area + pavg)  # Area should be positive, so take negative of the result.
+    return max(0.0, area + avg)  # Area should be positive, so take negative of the result.
 
 def proximity_test(segment1, segment2, critangle:float) -> bool:
     if segment2.start - segment1.end < critangle:
@@ -278,10 +236,11 @@ def centers_of_equal_area(outer_radius:float, inner_radius:float, num_rings:int)
     return center_radii
 
 class Segment:
-    def __init__(self,segmentdata:pd.DataFrame,pavg:float):
+    def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
         self.segmentdata = segmentdata
-        self.pavg = pavg
-        self.area_bar = area_bar(segmentdata,pavg)
+        self.avg = avg
+        self.value = value
+        self.area_bar = area_bar(segmentdata,avg,value)
         if (self.segmentdata.iloc[0]['theta'] < .01) and (self.segmentdata.iloc[-1]['theta'] > 359.99):
             self.extent = (360 - self.segmentdata.iloc[-1]['theta']) + self.segmentdata.iloc[0]['theta']
             self.start = self.segmentdata.iloc[-1]['theta']
@@ -293,25 +252,44 @@ class Segment:
 
     def plotsegment(self):
         fig, ax = plt.subplots()
-        ax.plot(self.segmentdata['theta'], self.segmentdata['pt'], label='Pressure')
-        ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
+        ax.plot(self.segmentdata['theta'], self.segmentdata[self.value], label=self.value)
+        ax.axhline(self.avg, color='red', linestyle='--', label=f'Average {self.value}')
         ax.set_xlabel('Theta (degrees)')
-        ax.set_ylabel('Pressure')
+        ax.set_ylabel(self.value)
+
+class PressureSegment(Segment):
+    def __init__(self,segmentdata:pd.DataFrame,pavg:float):
+        super().__init__(segmentdata,pavg,'pt')
+
+class SwirlSegment(Segment):
+    def __init__(self,segmentdata:pd.DataFrame):
+        super().__init__(segmentdata,0,'swirl')
+
+    def avgSwirl(self) -> float:
+        """Calculate the average swirl angle for the segment."""
+        integrate = np.trapz(self.segmentdata['swirl'], self.segmentdata['theta'])
+        return integrate / self.extent if self.extent > 0 else 0
 
 class Ring:
     def __init__(self,ringdata:pd.DataFrame):
-        """The ringdata dataframe should have columns 'r', 'theta', and 'pt'."""
+        """The ringdata dataframe should have columns 'r', 'theta', and 'pt',"""
 
         dfcheck(ringdata)
 
         self.ringdata = ringdata
         self.r = ringdata['r'].mean()
 
-        # Find Segments
+        # Find Pressure Segments
         self.pavg = self.ringdata['pt'].mean()
-        zerosegments = findnegative_segments(ringdata,self.pavg)
+        zerosegments = findnegative_segments(ringdata,self.pavg,'pt')
         # Sort segments by their starting theta value for consistent ordering.
-        self.segments = sorted([Segment(seg, self.pavg) for seg in zerosegments], key=lambda seg: seg.start)
+        self.segments = sorted([PressureSegment(seg, self.pavg) for seg in zerosegments], key=lambda seg: seg.start)
+
+        #Find Swirl Segments
+        #Make sure swirl is not all zero before calculating swirl segments
+        if not np.all(self.ringdata['swirl'] == 0):
+            swirlsegments = find_segments(ringdata,0,'swirl')
+            self.swirlsegments = sorted([SwirlSegment(seg) for seg in swirlsegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
         return self.ringdata['pt'].mean()
@@ -378,14 +356,12 @@ class Ring:
             extentsum += self.segments[segment_index].extent
         return weightedCDI, extentsum
     
-    #def select_max_theta()
-
-    def plotring(self) -> plt.axes:
+    def plotring(self,value) -> plt.axes:
         fig, ax = plt.subplots()
-        ax.plot(self.ringdata['theta'], self.ringdata['pt'], label='Pressure')
-        ax.axhline(self.pavg, color='red', linestyle='--', label='Average Pressure')
+        ax.plot(self.ringdata['theta'], self.ringdata[value], label=value)
+        ax.axhline(self.ringdata[value].mean(), color='red', linestyle='--', label=f'Average {value}')
         ax.set_xlabel('Theta (degrees)')
-        ax.set_ylabel('Pressure')
+        ax.set_ylabel(value)
         return ax
     
     def fft(self):
@@ -411,6 +387,7 @@ class Ring:
         resampled_pt = interpfit_fft(self.ringdata['pt'], n)
         resampled_ps = interpfit_fft(self.ringdata['ps'], n)
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
+        resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
         resampled_df = pd.DataFrame({
             'r': resampled_r,
@@ -419,7 +396,25 @@ class Ring:
             'ps': resampled_ps
         })
         return resampled_df
-        
+    
+    def swirlintensity(self) -> float:
+        """Calculates the SAE16 swirl intensity metric for the ring."""
+        numerator = 0.0
+        for segment in self.swirlsegments:
+            numerator += abs(segment.avgSwirl()) * segment.extent
+        return numerator / 360.0
+    
+    def swirlDirectivity(self) -> float:
+        """Calculates the SAE16 swirl directivity metric for the ring."""
+        numerator = 0.0
+        denominator = 0.0
+        for segment in self.swirlsegments:
+            numerator += segment.avgSwirl() * segment.extent
+            denominator += abs(segment.avgSwirl()) * segment.extent
+        if denominator == 0:
+            raise ValueError("Denominator is zero, cannot calculate swirl directivity.")
+        return numerator / denominator
+
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
     The df expects the following columns: 'r', 'theta', and 'pt'.
@@ -427,6 +422,9 @@ class Face:
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
+        # Add Swirl if column not already in dataframe, just set it to 0.
+        if 'swirl' not in datadf.columns:
+            datadf['swirl'] = 0.0
         dfcheck(datadf)
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
@@ -450,6 +448,13 @@ class Face:
     def CDImax(self) -> float:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
+
+    def swirlintensity(self,i) -> float:
+        return self.rings[i].swirlintensity()
+
+    def swirlintesitymax(self) -> float:
+        rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
+        return max(rings_swirlintensity)
     
     def HEI(self,ring:int) -> List[float]:
         """Calculates the Harmonic Energy Index for a specific ring."""

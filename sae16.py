@@ -107,7 +107,7 @@ def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     segments = []
     zero_crossings = findzero_crossing(data,avg,value)
     if len(zero_crossings) < 2:
-        raise ValueError("Not enough zero crossings to define segments.")
+        return [data] #Return the whole dataframe as a single segment if there are no zero crossings
     # Evaluate all adjacent crossing pairs plus the wrap-around pair (last -> first).
     crossing_pairs = list(zip(zero_crossings, zero_crossings[1:]))
     crossing_pairs.append((zero_crossings[-1], zero_crossings[0]))

@@ -305,6 +305,7 @@ class Ring:
         dfcheck(ringdata)
 
         self.ringdata = ringdata
+        self.r = ringdata['r'].mean()
 
         # Find Segments
         self.pavg = self.ringdata['pt'].mean()

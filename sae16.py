@@ -463,10 +463,14 @@ class Face:
         HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
         return HEI_values
 
-    def plotFace(self,includepts:bool=False,value='pt', colorbar:bool=False) -> plt.axes:
-        fig, ax = plt.subplots(figsize=(6, 6))
+    def plotFace(self,includepts:bool=False,value='pt', colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(6, 6))
+        else:
+            fig = ax.figure
         tris = Triangulation(self.df['r'] * np.cos(self.df['theta']*np.pi/180), self.df['r'] * np.sin(self.df['theta']*np.pi/180))
-        contour = ax.tricontourf(tris, self.df[value])
+        
+        contour = ax.tricontourf(tris, self.df[value], cmap=cmap)
         if includepts:
             ax.plot(self.df['r'] * np.cos(self.df['theta']*np.pi/180),
                     self.df['r'] * np.sin(self.df['theta']*np.pi/180),

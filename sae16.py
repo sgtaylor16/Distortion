@@ -240,7 +240,7 @@ class Segment:
         self.segmentdata = segmentdata
         self.avg = avg
         self.value = value
-        self.area_bar = area_bar(segmentdata,avg,value)
+
         if (self.segmentdata.iloc[0]['theta'] < .01) and (self.segmentdata.iloc[-1]['theta'] > 359.99):
             self.extent = (360 - self.segmentdata.iloc[-1]['theta']) + self.segmentdata.iloc[0]['theta']
             self.start = self.segmentdata.iloc[-1]['theta']
@@ -260,6 +260,7 @@ class Segment:
 class PressureSegment(Segment):
     def __init__(self,segmentdata:pd.DataFrame,pavg:float):
         super().__init__(segmentdata,pavg,'pt')
+        self.area_bar = area_bar(segmentdata,pavg,'pt')
 
 class SwirlSegment(Segment):
     def __init__(self,segmentdata:pd.DataFrame):

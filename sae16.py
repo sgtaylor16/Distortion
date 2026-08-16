@@ -357,8 +357,9 @@ class Ring:
             extentsum += self.segments[segment_index].extent
         return weightedCDI, extentsum
     
-    def plotring(self,value) -> plt.axes:
-        fig, ax = plt.subplots()
+    def plotring(self,value,ax:plt.Axes=None) -> plt.Axes:
+        if ax is None:
+            fig, ax = plt.subplots()
         ax.plot(self.ringdata['theta'], self.ringdata[value], label=value)
         ax.axhline(self.ringdata[value].mean(), color='red', linestyle='--', label=f'Average {value}')
         ax.set_xlabel('Theta (degrees)')
@@ -464,7 +465,7 @@ class Face:
         HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
         return HEI_values
 
-    def plotFace(self,includepts:bool=False,value='pt', colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:
+    def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:

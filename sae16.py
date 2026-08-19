@@ -377,8 +377,8 @@ class Ring:
         selected_fft = orderselect(fft_values, order, sumorders)
         harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
-            'x': self.ringdata['r'] * np.cos(self.ringdata['theta']),
-            'y': self.ringdata['r'] * np.sin(self.ringdata['theta']),
+            'x': self.ringdata['r'] * np.cos(np.deg2rad(self.ringdata['theta'])),
+            'y': self.ringdata['r'] * np.sin(np.deg2rad(self.ringdata['theta'])),
             'r': self.ringdata['r'],
             'theta': self.ringdata['theta'],
             'value': harmonic_value

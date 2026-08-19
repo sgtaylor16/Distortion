@@ -173,6 +173,7 @@ def orderselect(fft,order,sumorders:bool=False) -> np.ndarray:
     redfft = np.zeros(len(fft),dtype=complex)
     if not sumorders:
         redfft[order] = fft[order]
+        redfft[-order] = fft[-order]
         return redfft
     if sumorders:
         redfft[:order+1] = fft[:order+1]
@@ -366,15 +367,15 @@ class Ring:
         ax.set_ylabel(value)
         return ax
     
-    def fft(self):
-        p = self.ringdata['pt'].to_numpy()
+    def fft(self,value:str='pt') -> np.ndarray:
+        p = self.ringdata[value].to_numpy()
         return fft(p)
     
-    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
+    def calcHarmonic(self,order:int,value:str='pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
         fft_values = self.fft()
         selected_fft = orderselect(fft_values, order, sumorders)
-        harmonic_value = ifft(selected_fft).real #Do I nead the real?
+        harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
             'x': self.ringdata['r'] * np.cos(self.ringdata['theta']),
             'y': self.ringdata['r'] * np.sin(self.ringdata['theta']),

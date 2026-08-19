@@ -479,12 +479,12 @@ class Face:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
             fig = ax.figure
-        tris = Triangulation(self.df['r'] * np.cos(self.df['theta']*np.pi/180), self.df['r'] * np.sin(self.df['theta']*np.pi/180))
+        tris = Triangulation(self.df['r'] * np.cos(np.deg2rad(self.df['theta'])), self.df['r'] * np.sin(np.deg2rad(self.df['theta'])))
         
         contour = ax.tricontourf(tris, self.df[value], cmap=cmap)
         if includepts:
-            ax.plot(self.df['r'] * np.cos(self.df['theta']*np.pi/180),
-                    self.df['r'] * np.sin(self.df['theta']*np.pi/180),
+            ax.plot(self.df['r'] * np.cos(np.deg2rad(self.df['theta'] + 90)), #Adding the 90 degrees to rotate the points so that 0 degrees is at the top of the plot
+                    self.df['r'] * np.sin(np.deg2rad(self.df['theta'] + 90)),
                     'ko', markersize=2)
         if colorbar:
             cbar = fig.colorbar(contour, ax=ax)

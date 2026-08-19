@@ -236,6 +236,14 @@ def centers_of_equal_area(outer_radius:float, inner_radius:float, num_rings:int)
     
     return center_radii
 
+def stack_df(df,value) -> np.ndarray:
+
+    #Make sure theta and r are in df columns
+    if 'theta' not in df.columns or 'r' not in df.columns or value not in df.columns:
+        raise ValueError(f"DataFrame must contain 'theta', 'r', and '{value}' columns.")
+    newdf = df[['r','theta',value]].copy().sort_values(by=['r','theta']).reset_index(drop=True)
+    return newdf[value].to_numpy().reshape(-1,1)
+
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
         self.segmentdata = segmentdata

@@ -11,10 +11,10 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r', 'theta', and 'pt' and swirl. Swirl should be interpreted
-    as the swirl angle.
+    The required columns are 'r', 'theta', 'pt', 'ps', 'vswirl', and 'vaxial'.
+    'vswirl' should be interpreted as the swirl angle.
     """
-    required_columns = ['r', 'theta', 'pt','ps','swirl']
+    required_columns = ['r', 'theta', 'pt','ps','vswirl','vaxial']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -273,11 +273,11 @@ class PressureSegment(Segment):
 
 class SwirlSegment(Segment):
     def __init__(self,segmentdata:pd.DataFrame):
-        super().__init__(segmentdata,0,'swirl')
+        super().__init__(segmentdata,0,'vswirl')
 
     def avgSwirl(self) -> float:
         """Calculate the average swirl angle for the segment."""
-        integrate = np.trapz(self.segmentdata['swirl'], self.segmentdata['theta'])
+        integrate = np.trapz(self.segmentdata['vswirl'], self.segmentdata['theta'])
         return integrate / self.extent if self.extent > 0 else 0
 
 class Ring:
@@ -297,8 +297,8 @@ class Ring:
 
         #Find Swirl Segments
         #Make sure swirl is not all zero before calculating swirl segments
-        if not np.all(self.ringdata['swirl'] == 0):
-            swirlsegments = find_segments(ringdata,0,'swirl')
+        if not np.all(self.ringdata['vswirl'] == 0):
+            swirlsegments = find_segments(ringdata,0,'vswirl')
             self.swirlsegments = sorted([SwirlSegment(seg) for seg in swirlsegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
@@ -428,15 +428,17 @@ class Ring:
 
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
-    The df expects the following columns: 'r', 'theta', and 'pt'.
+    The df expects the following columns: 'r', 'theta', 'pt', 'ps', 'vswirl', and 'vaxial'.
     theta should be in degrees and should be in the range [0, 360).
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
-        # Add Swirl if column not already in dataframe, just set it to 0.
-        if 'swirl' not in datadf.columns:
-            datadf['swirl'] = 0.0
+        # Add vswirl if column not already in dataframe, just set it to 0.
+        if 'vswirl' not in datadf.columns:
+            datadf['vswirl'] = 0.0
+        # Calculate incidence
         dfcheck(datadf)
+        datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vxial']) * 180 / np.pi
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf

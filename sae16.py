@@ -14,7 +14,7 @@ def dfcheck(df:pd.DataFrame) -> bool:
     The required columns are 'r', 'theta', 'pt', 'ps', 'vswirl', and 'vaxial'.
     'vswirl' should be interpreted as the swirl angle.
     """
-    required_columns = ['r', 'theta', 'pt','ps','vswirl','vaxial']
+    required_columns = ['r', 'theta', 'pt','ps']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -400,12 +400,13 @@ class Ring:
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
         resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
+        other_columns = [col for col in self.ringdata.columns if col not in ['r', 'theta']]
         resampled_df = pd.DataFrame({
             'r': resampled_r,
-            'theta': resampled_theta,
-            'pt': resampled_pt,
-            'ps': resampled_ps
+            'theta': resampled_theta
         })
+        for col in other_columns:
+            resampled_df[col] = interpfit_fft(self.ringdata[col], n)
         return resampled_df
     
     def swirlintensity(self) -> float:
@@ -433,12 +434,15 @@ class Face:
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
+        datadf = datadf.copy()
         # Add vswirl if column not already in dataframe, just set it to 0.
         if 'vswirl' not in datadf.columns:
             datadf['vswirl'] = 0.0
+        if 'vaxial' not in datadf.columns:
+            datadf['vaxial'] = 0.0
         # Calculate incidence
         dfcheck(datadf)
-        datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vxial']) * 180 / np.pi
+        datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vaxial']) * 180 / np.pi
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf

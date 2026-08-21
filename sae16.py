@@ -485,7 +485,7 @@ class Face:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
             fig = ax.figure
-        tris = Triangulation(self.df['r'] * np.cos(np.deg2rad(self.df['theta'])), self.df['r'] * np.sin(np.deg2rad(self.df['theta'])))
+        tris = Triangulation(self.df['r'] * np.cos(np.deg2rad(self.df['theta']+90)), self.df['r'] * np.sin(np.deg2rad(self.df['theta']+90)))
         
         contour = ax.tricontourf(tris, self.df[value], cmap=cmap)
         if includepts:

@@ -508,11 +508,12 @@ class Face:
                 harmonics_by_ring = pd.concat([harmonics_by_ring, ring_harmonic], ignore_index=True)
         return harmonics_by_ring
     
-    def plotHarmonic(self, order: int, sumorders: bool = True) -> plt.axes:
+    def plotHarmonic(self, order: int, ax=None, sumorders: bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
         outdf = self.calcHarmonic(order, sumorders=sumorders)
         tris = Triangulation(outdf['x'], outdf['y'])
-        fig, ax = plt.subplots(figsize=(6, 6))
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
         return ax

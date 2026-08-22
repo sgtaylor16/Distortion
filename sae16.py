@@ -237,12 +237,22 @@ def centers_of_equal_area(outer_radius:float, inner_radius:float, num_rings:int)
     return center_radii
 
 def stack_df(df,value) -> np.ndarray:
+    """
+    Stack the DataFrame into a 2D array with shape (n, 1)
+    where n is the number of rows in the DataFrame.
+    The DataFrame must contain 'theta', 'r', and the specified value column."""
 
     #Make sure theta and r are in df columns
     if 'theta' not in df.columns or 'r' not in df.columns or value not in df.columns:
         raise ValueError(f"DataFrame must contain 'theta', 'r', and '{value}' columns.")
     newdf = df[['r','theta',value]].copy().sort_values(by=['r','theta']).reset_index(drop=True)
     return newdf[value].to_numpy().reshape(-1,1)
+
+def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
+    for value in valuelist:
+        if value not in df.columns:
+            raise ValueError(f"DataFrame must contain '{value}' column.")
+    return np.vstack([stack_df(df, value) for value in valuelist])
 
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
@@ -442,6 +452,8 @@ class Face:
             datadf['vaxial'] = 0.0
         # Calculate incidence
         dfcheck(datadf)
+        #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
+        datadf = datadf.sort_values(by=['r','theta']).reset_index(drop=True)
         datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vaxial']) * 180 / np.pi
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
@@ -570,3 +582,6 @@ class Face:
         """Resample the face to r_n rings and theta_n points per ring, returning a new Face object with the resampled data."""
         return self.resample_r(r_n).resample_theta(theta_n)
 
+    def stacks(self,valuelist:list[str]) -> np.ndarray:
+        """Stack the specified values from the face's dataframe into a 2D array."""
+        return stack_stacks(self.df,valuelist)

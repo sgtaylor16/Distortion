@@ -508,6 +508,7 @@ class Face:
             cbar = fig.colorbar(contour, ax=ax)
             cbar.set_label(value)
         ax.set_aspect('equal')
+        ax.invert_xaxis()
         return ax
 
     def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
@@ -528,6 +529,7 @@ class Face:
             fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
+        ax.invert_xaxis()
         return ax
     
     def resample_theta(self, n:int) -> 'Face':

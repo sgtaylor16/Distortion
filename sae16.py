@@ -497,17 +497,18 @@ class Face:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
             fig = ax.figure
-        tris = Triangulation(self.df['r'] * np.cos(np.deg2rad(self.df['theta']+90)), self.df['r'] * np.sin(np.deg2rad(self.df['theta']+90)))
+        tris = Triangulation(self.df['r'] * -np.sin(np.deg2rad(self.df['theta'])), self.df['r'] * np.cos(np.deg2rad(self.df['theta'])))
         
         contour = ax.tricontourf(tris, self.df[value], cmap=cmap)
         if includepts:
-            ax.plot(self.df['r'] * np.cos(np.deg2rad(self.df['theta'] + 90)), #Adding the 90 degrees to rotate the points so that 0 degrees is at the top of the plot
-                    self.df['r'] * np.sin(np.deg2rad(self.df['theta'] + 90)),
+            ax.plot(self.df['r'] * -np.sin(np.deg2rad(self.df['theta'])),
+                    self.df['r'] * np.cos(np.deg2rad(self.df['theta'])),
                     'ko', markersize=2)
         if colorbar:
             cbar = fig.colorbar(contour, ax=ax)
             cbar.set_label(value)
         ax.set_aspect('equal')
+        ax.invert_xaxis()
         return ax
 
     def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
@@ -523,11 +524,12 @@ class Face:
     def plotHarmonic(self, order: int, ax=None, sumorders: bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
         outdf = self.calcHarmonic(order, sumorders=sumorders)
-        tris = Triangulation(outdf['x'], outdf['y'])
+        tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
         ax.tricontourf(tris, outdf['value'])
         ax.set_aspect('equal')
+        ax.invert_xaxis()
         return ax
     
     def resample_theta(self, n:int) -> 'Face':

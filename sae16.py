@@ -516,7 +516,9 @@ class Face:
         return ax
 
     def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
-        """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r and value columns."""
+        """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r, theta and value columns.
+        The dataframe is ordered by r's first, at each r the theta's are walked through.
+        """
         for i,ring in enumerate(self.rings):
             ring_harmonic = ring.calcHarmonic(order=order,value=value,sumorders= sumorders)
             if i == 0:
@@ -665,3 +667,18 @@ class FaceCollection:
         feature_vector = U_order[feature_idx * self.feature_height : (feature_idx * self.feature_height + self.feature_height)]
 
         return feature_vector
+
+    def restack_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str) -> pd.DataFrame:
+
+        columnvector = self.extract_svd_feature(order,mode_num,valuelist,feature)
+
+        #Grab an arbitrary face dataframe from the collection, they should all be the same.
+        df = self.faces[0].df
+
+        #Check to make sure that the rows of df match the length of the column vector
+        if df.shape[0] != len(columnvector):
+            raise ValueError()
+
+        df[feature] = columnvector
+
+        return df

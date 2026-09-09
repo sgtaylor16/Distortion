@@ -514,7 +514,7 @@ class Face:
     def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r and value columns."""
         for i,ring in enumerate(self.rings):
-            ring_harmonic = ring.calcHarmonic(order, sumorders)
+            ring_harmonic = ring.calcHarmonic(order=order,value=value,sumorders= sumorders)
             if i == 0:
                 harmonics_by_ring = ring_harmonic
             else:
@@ -594,9 +594,10 @@ class Face:
 
 class FaceCollection:
 
-    def __init__(self,faces:List[Face]):
+    def __init__(self,faces:List[Face],conditionlist:List[int]=None):
         self.faces = faces
         self.nfaces = len(faces)
+        self.conditionlist = conditionlist
 
         #Check that all faces have the same stackheight
         heightlist = [face.calc_stackheight() for face in self.faces]

@@ -511,7 +511,7 @@ class Face:
         ax.invert_xaxis()
         return ax
 
-    def calcHarmonic(self,order:int,sumorders:bool=False) -> pd.DataFrame:
+    def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r and value columns."""
         for i,ring in enumerate(self.rings):
             ring_harmonic = ring.calcHarmonic(order, sumorders)
@@ -521,7 +521,7 @@ class Face:
                 harmonics_by_ring = pd.concat([harmonics_by_ring, ring_harmonic], ignore_index=True)
         return harmonics_by_ring
     
-    def plotHarmonic(self, order: int, ax=None, sumorders: bool = True) -> plt.axes:
+    def plotHarmonic(self, order:int,value='pt', ax=None, sumorders:bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
         outdf = self.calcHarmonic(order, sumorders=sumorders)
         tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
@@ -540,7 +540,7 @@ class Face:
             resampled_rings.append(resampled_df)
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)
-    
+        
     def resample_r(self,r_n: int) -> 'Face':
         """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data."""
         outer_radius = self.df['r'].max()
@@ -587,3 +587,62 @@ class Face:
     def stacks(self,valuelist:list[str]) -> np.ndarray:
         """Stack the specified values from the face's dataframe into a 2D array."""
         return stack_stacks(self.df,valuelist)
+
+    def calc_stackheight(self) -> int:
+        """Calculate the stack height of the face, defined as the number of unique measurement locations on a face"""
+        return self.datadf.shape[0]
+
+class FaceCollection:
+
+    def __init__(self,faces:List[Face]):
+        self.faces = faces
+        self.nfaces = len(faces)
+
+        #Check that all faces have the same stackheight
+        heightlist = [face.calc_stackheight() for face in self.faces]
+        if not all(height == heightlist[0] for height in heightlist):
+            raise ValueError("All faces must have the same stack height")
+
+        self.feature_height = heightlist[0]
+
+    def harmonic_matrix(self, order:int,valuelist:List[str]) -> np.ndarray:
+        """Calculate the harmonic matrix for the collection of faces.
+        Each column corresponds to a face. The rows correspond to the stacked harmonic values for each value in valuelist."""
+
+        #Initialize an empty numpy array
+        harmonic_matrix = np.zeros((self.feature_height * len(valuelist), self.nfaces))
+        for k,face in enumerate(self.faces):
+            harmonics_dict = {}
+            for value in valuelist:
+                harmonics_dict[value] = face.calcHarmonic(order, value)['value'].to_numpy().resize(-1,1)
+            harmonic_matrix[:,k] = np.vstack([harmonics_dict[value] for value in valuelist]).flatten()
+
+    def harmonic_svd(self,order:int,valuelist:List[str]) -> tuple[np.ndarray,np.ndarray,np.ndarray]:
+        """Calculate the SVD of the harmonic matrix for the collection of faces."""
+        harmonic_matrix = self.harmonic_matrix(order,valuelist)
+        U, S, VT = np.linalg.svd(harmonic_matrix, full_matrices=False)
+        return U, S, VT
+
+    def extract_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str) -> np.ndarray:
+        """Extract a specific feature from the SVD of the harmonic matrix for the collection of faces."""
+
+        if feature not in valuelist:
+            raise ValueError(f"Feature '{feature}' not found in valuelist.")
+
+
+        U, S, VT = self.harmonic_svd(order,valuelist=valuelist)
+
+        if order >= U.shape[1]:
+            raise ValueError(f"Order {order} is out of bounds for the harmonic matrix with columns {U.shape[1]}.")
+
+        #Extract the correct column
+        U_order = U[:, order]
+
+        #Extract the correct feature
+        for idx, val in enumerate(valuelist):
+            if val == feature:
+                feature_idx = idx
+                break
+        feature_vector = U_order[feature_idx * self.feature_height : (feature_idx * self.feature_height + self.feature_height)]
+
+        return feature_vector

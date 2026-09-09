@@ -590,7 +590,7 @@ class Face:
 
     def calc_stackheight(self) -> int:
         """Calculate the stack height of the face, defined as the number of unique measurement locations on a face"""
-        return self.datadf.shape[0]
+        return self.df.shape[0]
 
 class FaceCollection:
 

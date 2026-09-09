@@ -388,11 +388,15 @@ class Ring:
     def fft(self,value:str='pt') -> np.ndarray:
         p = self.ringdata[value].to_numpy()
         return fft(p)
+
+    def ringfft(self,order:int,value:str='pt',sumorders:bool=False):
+        fft_values = self.fft()
+        return orderselect(fft_values,order,sumorders)
     
     def calcHarmonic(self,order:int,value:str='pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
         fft_values = self.fft()
-        selected_fft = orderselect(fft_values, order, sumorders)
+        selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
         harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
             'x': self.ringdata['r'] * np.cos(np.deg2rad(self.ringdata['theta'])),
@@ -592,6 +596,19 @@ class Face:
         """Calculate the stack height of the face, defined as the number of unique measurement locations on a face"""
         return self.df.shape[0]
 
+    def plot_ring_harmonics(self,maxorder:int,value='pt'):
+        """
+        Plots the magnitude of the fourier transform for each order, by radius
+        """
+        radiuslist = [x.r for x in self.rings]
+        fftlist = [abs(x.ringfft(maxorder,value,True)) for x in self.rings]
+
+        fig,ax = plt.subplots()
+
+        for i in [i for i in range(maxorder) if i !=0]:
+            ax.plot([x[i] for x in fftlist],radiuslist,label=f"order {i}")
+            ax.legend()
+
 class FaceCollection:
 
     def __init__(self,faces:List[Face],conditionlist:List[int]=None):
@@ -615,8 +632,10 @@ class FaceCollection:
         for k,face in enumerate(self.faces):
             harmonics_dict = {}
             for value in valuelist:
-                harmonics_dict[value] = face.calcHarmonic(order, value)['value'].to_numpy().resize(-1,1)
+                harmonics_dict[value] = face.calcHarmonic(order, value)['value'].to_numpy().reshape(-1,1)
             harmonic_matrix[:,k] = np.vstack([harmonics_dict[value] for value in valuelist]).flatten()
+
+        return harmonic_matrix
 
     def harmonic_svd(self,order:int,valuelist:List[str]) -> tuple[np.ndarray,np.ndarray,np.ndarray]:
         """Calculate the SVD of the harmonic matrix for the collection of faces."""
@@ -629,7 +648,6 @@ class FaceCollection:
 
         if feature not in valuelist:
             raise ValueError(f"Feature '{feature}' not found in valuelist.")
-
 
         U, S, VT = self.harmonic_svd(order,valuelist=valuelist)
 

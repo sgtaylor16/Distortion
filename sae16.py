@@ -254,8 +254,8 @@ def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
     return np.vstack([stack_df(df, value) for value in valuelist])
 
 def plotutility(df:pd.DataFrame,value:str):
+    return None
     
-
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
         self.segmentdata = segmentdata
@@ -490,11 +490,14 @@ class Face:
         rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
         return max(rings_swirlintensity)
     
-    def HEI(self,ring:int) -> List[float]:
+    def HEI(self,ring:int,value='pt',normalize:bool=True) -> List[float]:
         """Calculates the Harmonic Energy Index for a specific ring."""
-        fft_values = self.rings[ring].fft()
+        fft_values = self.rings[ring].fft(value)
         q = self.df['pt'].mean() - self.df['ps'].mean()
-        HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        if normalize:
+            HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        else:
+            HEI_values = [np.abs(fft_values(n)) for n in range(1, len(fft_values)//2)]
         return HEI_values
 
     def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:

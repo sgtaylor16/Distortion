@@ -7,7 +7,6 @@ from matplotlib.tri import Triangulation
 from scipy.fft import fft, ifft
 from scipy.signal import resample
 
-
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
@@ -254,6 +253,9 @@ def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
             raise ValueError(f"DataFrame must contain '{value}' column.")
     return np.vstack([stack_df(df, value) for value in valuelist])
 
+def plotutility(df:pd.DataFrame,value:str):
+    
+
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
         self.segmentdata = segmentdata
@@ -390,12 +392,11 @@ class Ring:
         return fft(p)
 
     def ringfft(self,order:int,value:str='pt',sumorders:bool=False):
-        fft_values = self.fft()
+        fft_values = self.fft(value)
         return orderselect(fft_values,order,sumorders)
     
     def calcHarmonic(self,order:int,value:str='pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
-        fft_values = self.fft()
         selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
         harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
@@ -669,11 +670,13 @@ class FaceCollection:
         return feature_vector
 
     def restack_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str) -> pd.DataFrame:
-
+        """
+        Takes the column vector caclulated by svd and places it back in a df formatted the same as face.
+        """
         columnvector = self.extract_svd_feature(order,mode_num,valuelist,feature)
 
         #Grab an arbitrary face dataframe from the collection, they should all be the same.
-        df = self.faces[0].df
+        df = self.faces[0].df[['radius','theta']]
 
         #Check to make sure that the rows of df match the length of the column vector
         if df.shape[0] != len(columnvector):

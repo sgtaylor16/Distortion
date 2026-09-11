@@ -519,7 +519,7 @@ class Face:
         if normalize:
             HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
         else:
-            HEI_values = [np.abs(fft_values(n)) for n in range(1, len(fft_values)//2)]
+            HEI_values = [np.abs(fft_values[n]) for n in range(1, len(fft_values)//2)]
         return HEI_values
 
     def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:
@@ -555,7 +555,7 @@ class Face:
     
     def plotHarmonic(self, order:int,value='pt', ax=None, sumorders:bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
-        outdf = self.calcHarmonic(order, sumorders=sumorders)
+        outdf = self.calcHarmonic(order,value,sumorders=sumorders)
         tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))

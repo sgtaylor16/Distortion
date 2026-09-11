@@ -517,7 +517,7 @@ class Face:
         fft_values = self.rings[ring].fft(value)
         q = self.df['pt'].mean() - self.df['ps'].mean()
         if normalize:
-            HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+            HEI_values = [np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
         else:
             HEI_values = [np.abs(fft_values[n]) for n in range(1, len(fft_values)//2)]
         return HEI_values

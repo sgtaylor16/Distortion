@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List
+from typing import List,Tuple
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -255,6 +255,20 @@ def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
 
 def plotutility(df:pd.DataFrame,value:str):
     return None
+
+def rescale_columns(df:pd.DataFrame) -> Tuple[List[str],List[str]]:
+    """Screens dataframe df for columns that can be rescaled in the theta dimension. Retuns a list of eligable column names
+    Returns a list of columns to scale and a list of columns to leave unchanged"""
+    ineligable_columns = []
+    for column in df.columns:
+        if (df[column].dtype != float):
+            ineligable_columns.append(column)
+        if (column == 'r') or (column == 'theta'):
+            ineligable_columns.append(column)
+    eligable_columns = [x for x in df.columns if x not in ineligable_columns]
+    ineligable_columns = [x for x in ineligable_columns if x not in ['r','theta']]
+
+    return eligable_columns,ineligable_columns
     
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
@@ -410,8 +424,6 @@ class Ring:
     
     def resample_df(self, n:int) -> pd.DataFrame:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
-        resampled_pt = interpfit_fft(self.ringdata['pt'], n)
-        resampled_ps = interpfit_fft(self.ringdata['ps'], n)
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
         resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
         resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
@@ -420,8 +432,14 @@ class Ring:
             'r': resampled_r,
             'theta': resampled_theta
         })
-        for col in other_columns:
+        # Group the columns into ones that should be interpolated and those that shouldn't.
+        fit_columns,constant_columns = rescale_columns(self.df)
+        #Interpolate the fit columns
+        for col in fit_columns:
             resampled_df[col] = interpfit_fft(self.ringdata[col], n)
+        #Leave unchange the constant columns
+        for col in constant_columns:
+            resampled_df[col] = self.ringdata[col][0]
         return resampled_df
     
     def swirlintensity(self) -> float:
@@ -460,6 +478,10 @@ class Face:
         #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
         datadf = datadf.sort_values(by=['r','theta']).reset_index(drop=True)
         datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vaxial']) * 180 / np.pi
+
+        integer_columns = datadf.select_dtypes(include=["integer"]).columns
+        datadf[integer_columns] = datadf[integer_columns].astype(float)
+
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf
@@ -577,15 +599,23 @@ class Face:
                 t = (center_r - r_below) / (r_above - r_below)
 
                 thetas = ring_below.ringdata['theta'].values
-                pt_below = ring_below.ringdata['pt'].values
-                pt_above = ring_above.ringdata['pt'].values
-                pt_interp = (1 - t) * pt_below + t * pt_above
 
-                ps_below = ring_below.ringdata['ps'].values
-                ps_above = ring_above.ringdata['ps'].values
-                ps_interp = (1 - t) * ps_below + t * ps_above
+                fit_columns,constant_columns = rescale_columns(self.df)
 
-                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'pt': pt_interp, 'ps': ps_interp}))
+                dfdict={}
+                for onecolumn in fit_columns:
+                    values_below = ring_below.ringdata[onecolumn].values
+                    values_above = ring_above.ringdata[onecolumn].values
+                    values_interp = (1-t) * values_below + t * values_above
+                    dfdict[onecolumn] = values_interp
+
+                for onecolumn in constant_columns:
+                    dfdict[onecolumn] = len(thetas) * [self.df[onecolumn][0]]
+
+                dfdict['theta'] = thetas
+                dfdict['r'] = len(thetas) *[center_r]
+
+                resampled_rings.append(pd.DataFrame(dfdict))
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)

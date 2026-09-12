@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List
+from typing import List,Tuple
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,8 +10,8 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r', 'theta', 'pt', 'ps', 'vswirl', and 'vaxial'.
-    'vswirl' should be interpreted as the swirl angle.
+    The required columns are 'r', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
+    'v_swirl' should be interpreted as the swirl angle.
     """
     required_columns = ['r', 'theta', 'pt','ps']
     for col in required_columns:
@@ -272,6 +272,20 @@ def plotutility(df: pd.DataFrame, value: str = 'pt', includepts: bool = False, c
     ax.invert_xaxis()
     return ax
 
+def rescale_columns(df:pd.DataFrame) -> Tuple[List[str],List[str]]:
+    """Screens dataframe df for columns that can be rescaled in the theta dimension. Retuns a list of eligable column names
+    Returns a list of columns to scale and a list of columns to leave unchanged"""
+    ineligable_columns = []
+    for column in df.columns:
+        if (df[column].dtype != float):
+            ineligable_columns.append(column)
+        if (column == 'r') or (column == 'theta'):
+            ineligable_columns.append(column)
+    eligable_columns = [x for x in df.columns if x not in ineligable_columns]
+    ineligable_columns = [x for x in ineligable_columns if x not in ['r','theta']]
+
+    return eligable_columns,ineligable_columns
+    
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
         self.segmentdata = segmentdata
@@ -301,36 +315,36 @@ class PressureSegment(Segment):
 
 class SwirlSegment(Segment):
     def __init__(self,segmentdata:pd.DataFrame):
-        super().__init__(segmentdata,0,'vswirl')
+        super().__init__(segmentdata,0,'v_swirl')
 
     def avgSwirl(self) -> float:
         """Calculate the average swirl angle for the segment."""
-        integrate = np.trapz(self.segmentdata['vswirl'], self.segmentdata['theta'])
+        integrate = np.trapz(self.segmentdata['v_swirl'], self.segmentdata['theta'])
         return integrate / self.extent if self.extent > 0 else 0
 
 class Ring:
-    def __init__(self,ringdata:pd.DataFrame):
-        """The ringdata dataframe should have columns 'r', 'theta', and 'pt',"""
+    def __init__(self,df:pd.DataFrame):
+        """The dataframe should have columns 'r', 'theta', and 'pt',"""
 
-        dfcheck(ringdata)
+        dfcheck(df)
 
-        self.ringdata = ringdata
-        self.r = ringdata['r'].mean()
+        self.df = df
+        self.r = df['r'].mean()
 
         # Find Pressure Segments
-        self.pavg = self.ringdata['pt'].mean()
-        zerosegments = findnegative_segments(ringdata,self.pavg,'pt')
+        self.pavg = self.df['pt'].mean()
+        zerosegments = findnegative_segments(df,self.pavg,'pt')
         # Sort segments by their starting theta value for consistent ordering.
         self.segments = sorted([PressureSegment(seg, self.pavg) for seg in zerosegments], key=lambda seg: seg.start)
 
         #Find Swirl Segments
         #Make sure swirl is not all zero before calculating swirl segments
-        if not np.all(self.ringdata['vswirl'] == 0):
-            swirlsegments = find_segments(ringdata,0,'vswirl')
+        if not np.all(self.df['v_swirl'] == 0):
+            swirlsegments = find_segments(df,0,'v_swirl')
             self.swirlsegments = sorted([SwirlSegment(seg) for seg in swirlsegments], key=lambda seg: seg.start)
 
     def PAV(self) -> float:
-        return self.ringdata['pt'].mean()
+        return self.df['pt'].mean()
     
     def extents(self,critangle:float = 25.0) -> List[float]:
         pavg = self.PAV()
@@ -360,10 +374,10 @@ class Ring:
         #Find the regions of the ring where p is below the average value
         pavg = self.PAV()
         #Find the zero crossings of p - pavg
-        zero_crossings = findzero_crossing(self.ringdata,pavg)
+        zero_crossings = findzero_crossing(self.df,pavg)
         if len(zero_crossings) < 2:
             raise ValueError("Not enough zero crossings to define segments.")
-        zero_segments = findnegative_segments(self.ringdata,pavg)
+        zero_segments = findnegative_segments(self.df,pavg)
 
         if len(self.segments) == 0:
             return 0.0
@@ -397,14 +411,14 @@ class Ring:
     def plotring(self,value,ax:plt.Axes=None) -> plt.Axes:
         if ax is None:
             fig, ax = plt.subplots()
-        ax.plot(self.ringdata['theta'], self.ringdata[value], label=value)
-        ax.axhline(self.ringdata[value].mean(), color='red', linestyle='--', label=f'Average {value}')
+        ax.plot(self.df['theta'], self.df[value], label=value)
+        ax.axhline(self.df[value].mean(), color='red', linestyle='--', label=f'Average {value}')
         ax.set_xlabel('Theta (degrees)')
         ax.set_ylabel(value)
         return ax
     
     def fft(self,value:str='pt') -> np.ndarray:
-        p = self.ringdata[value].to_numpy()
+        p = self.df[value].to_numpy()
         return fft(p)
 
     def ringfft(self,order:int,value:str='pt',sumorders:bool=False):
@@ -416,28 +430,32 @@ class Ring:
         selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
         harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
-            'x': self.ringdata['r'] * np.cos(np.deg2rad(self.ringdata['theta'])),
-            'y': self.ringdata['r'] * np.sin(np.deg2rad(self.ringdata['theta'])),
-            'r': self.ringdata['r'],
-            'theta': self.ringdata['theta'],
+            'x': self.df['r'] * np.cos(np.deg2rad(self.df['theta'])),
+            'y': self.df['r'] * np.sin(np.deg2rad(self.df['theta'])),
+            'r': self.df['r'],
+            'theta': self.df['theta'],
             'value': harmonic_value
         })
         return outdf
     
     def resample_df(self, n:int) -> pd.DataFrame:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
-        resampled_pt = interpfit_fft(self.ringdata['pt'], n)
-        resampled_ps = interpfit_fft(self.ringdata['ps'], n)
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
         resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
-        resampled_r = np.full(n, self.ringdata['r'].iloc[0]) #Assumes r is constant within the ring
-        other_columns = [col for col in self.ringdata.columns if col not in ['r', 'theta']]
+        resampled_r = np.full(n, self.df['r'].iloc[0]) #Assumes r is constant within the ring
+        other_columns = [col for col in self.df.columns if col not in ['r', 'theta']]
         resampled_df = pd.DataFrame({
             'r': resampled_r,
             'theta': resampled_theta
         })
-        for col in other_columns:
-            resampled_df[col] = interpfit_fft(self.ringdata[col], n)
+        # Group the columns into ones that should be interpolated and those that shouldn't.
+        fit_columns,constant_columns = rescale_columns(self.df)
+        #Interpolate the fit columns
+        for col in fit_columns:
+            resampled_df[col] = interpfit_fft(self.df[col], n)
+        #Leave unchange the constant columns
+        for col in constant_columns:
+            resampled_df[col] = self.df[col][0]
         return resampled_df
     
     def swirlintensity(self) -> float:
@@ -460,22 +478,26 @@ class Ring:
 
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
-    The df expects the following columns: 'r', 'theta', 'pt', 'ps', 'vswirl', and 'vaxial'.
+    The df expects the following columns: 'r', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
     theta should be in degrees and should be in the range [0, 360).
     """
 
     def __init__(self,datadf:pd.DataFrame,tolerance=0.05,critangle:float = 25.0):
         datadf = datadf.copy()
-        # Add vswirl if column not already in dataframe, just set it to 0.
-        if 'vswirl' not in datadf.columns:
-            datadf['vswirl'] = 0.0
-        if 'vaxial' not in datadf.columns:
-            datadf['vaxial'] = 0.0
+        # Add v_swirl if column not already in dataframe, just set it to 0.
+        if 'v_swirl' not in datadf.columns:
+            datadf['v_swirl'] = 0.0
+        if 'v_axial' not in datadf.columns:
+            datadf['v_axial'] = 0.0
         # Calculate incidence
         dfcheck(datadf)
         #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
         datadf = datadf.sort_values(by=['r','theta']).reset_index(drop=True)
-        datadf['incidence'] = np.arctan2(datadf['vswirl'],datadf['vaxial']) * 180 / np.pi
+        datadf['incidence'] = np.arctan2(datadf['v_swirl'],datadf['v_axial']) * 180 / np.pi
+
+        integer_columns = datadf.select_dtypes(include=["integer"]).columns
+        datadf[integer_columns] = datadf[integer_columns].astype(float)
+
         ringsegments = findrings(datadf,tolerance)
         self.rings = [Ring(ringdata) for ringdata in ringsegments]
         self.df = datadf
@@ -506,11 +528,14 @@ class Face:
         rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
         return max(rings_swirlintensity)
     
-    def HEI(self,ring:int) -> List[float]:
+    def HEI(self,ring:int,value='pt',normalize:bool=True) -> List[float]:
         """Calculates the Harmonic Energy Index for a specific ring."""
-        fft_values = self.rings[ring].fft()
+        fft_values = self.rings[ring].fft(value)
         q = self.df['pt'].mean() - self.df['ps'].mean()
-        HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        if normalize:
+            HEI_values = [np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+        else:
+            HEI_values = [np.abs(fft_values[n]) for n in range(1, len(fft_values)//2)]
         return HEI_values
 
     def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.Axes:
@@ -530,7 +555,7 @@ class Face:
     
     def plotHarmonic(self, order:int,value='pt', ax=None, sumorders:bool = True) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
-        outdf = self.calcHarmonic(order, sumorders=sumorders)
+        outdf = self.calcHarmonic(order,value,sumorders=sumorders)
         tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
@@ -554,8 +579,8 @@ class Face:
         inner_radius = self.df['r'].min()
         center_radii = centers_of_equal_area(outer_radius, inner_radius, r_n)
 
-        sorted_rings = sorted(self.rings, key=lambda ring: ring.ringdata['r'].iloc[0])
-        ring_radii = np.array([ring.ringdata['r'].iloc[0] for ring in sorted_rings])
+        sorted_rings = sorted(self.rings, key=lambda ring: ring.df['r'].iloc[0])
+        ring_radii = np.array([ring.df['r'].iloc[0] for ring in sorted_rings])
 
         resampled_rings = []
         for center_r in center_radii:
@@ -563,9 +588,9 @@ class Face:
             idx_below = idx_above - 1
 
             if idx_below < 0:
-                resampled_rings.append(sorted_rings[0].ringdata.assign(r=center_r))
+                resampled_rings.append(sorted_rings[0].df.assign(r=center_r))
             elif idx_above >= len(sorted_rings):
-                resampled_rings.append(sorted_rings[-1].ringdata.assign(r=center_r))
+                resampled_rings.append(sorted_rings[-1].df.assign(r=center_r))
             else:
                 ring_below = sorted_rings[idx_below]
                 ring_above = sorted_rings[idx_above]
@@ -573,16 +598,24 @@ class Face:
                 r_above = ring_radii[idx_above]
                 t = (center_r - r_below) / (r_above - r_below)
 
-                thetas = ring_below.ringdata['theta'].values
-                pt_below = ring_below.ringdata['pt'].values
-                pt_above = ring_above.ringdata['pt'].values
-                pt_interp = (1 - t) * pt_below + t * pt_above
+                thetas = ring_below.df['theta'].values
 
-                ps_below = ring_below.ringdata['ps'].values
-                ps_above = ring_above.ringdata['ps'].values
-                ps_interp = (1 - t) * ps_below + t * ps_above
+                fit_columns,constant_columns = rescale_columns(self.df)
 
-                resampled_rings.append(pd.DataFrame({'r': center_r, 'theta': thetas, 'pt': pt_interp, 'ps': ps_interp}))
+                dfdict={}
+                for onecolumn in fit_columns:
+                    values_below = ring_below.df[onecolumn].values
+                    values_above = ring_above.df[onecolumn].values
+                    values_interp = (1-t) * values_below + t * values_above
+                    dfdict[onecolumn] = values_interp
+
+                for onecolumn in constant_columns:
+                    dfdict[onecolumn] = len(thetas) * [self.df[onecolumn][0]]
+
+                dfdict['theta'] = thetas
+                dfdict['r'] = len(thetas) *[center_r]
+
+                resampled_rings.append(pd.DataFrame(dfdict))
 
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)

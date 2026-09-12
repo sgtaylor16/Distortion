@@ -253,8 +253,24 @@ def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
             raise ValueError(f"DataFrame must contain '{value}' column.")
     return np.vstack([stack_df(df, value) for value in valuelist])
 
-def plotutility(df:pd.DataFrame,value:str):
+def plotutility(df: pd.DataFrame, value: str = 'pt', includepts: bool = False, colorbar: bool = False, cmap: str = 'viridis', ax: plt.Axes = None) -> plt.Axes:
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 6))
+    else:
+        fig = ax.figure
+    tris = Triangulation(df['r'] * -np.sin(np.deg2rad(df['theta'])), df['r'] * np.cos(np.deg2rad(df['theta'])))
     
+    contour = ax.tricontourf(tris, df[value], cmap=cmap)
+    if includepts:
+        ax.plot(df['r'] * -np.sin(np.deg2rad(df['theta'])),
+                df['r'] * np.cos(np.deg2rad(df['theta'])),
+                'ko', markersize=2)
+    if colorbar:
+        cbar = fig.colorbar(contour, ax=ax)
+        cbar.set_label(value)
+    ax.set_aspect('equal')
+    ax.invert_xaxis()
+    return ax
 
 class Segment:
     def __init__(self,segmentdata:pd.DataFrame,avg:float,value:str='pt'):
@@ -497,24 +513,8 @@ class Face:
         HEI_values = [(len(fft_values)//2) * np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
         return HEI_values
 
-    def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.axes:
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(6, 6))
-        else:
-            fig = ax.figure
-        tris = Triangulation(self.df['r'] * -np.sin(np.deg2rad(self.df['theta'])), self.df['r'] * np.cos(np.deg2rad(self.df['theta'])))
-        
-        contour = ax.tricontourf(tris, self.df[value], cmap=cmap)
-        if includepts:
-            ax.plot(self.df['r'] * -np.sin(np.deg2rad(self.df['theta'])),
-                    self.df['r'] * np.cos(np.deg2rad(self.df['theta'])),
-                    'ko', markersize=2)
-        if colorbar:
-            cbar = fig.colorbar(contour, ax=ax)
-            cbar.set_label(value)
-        ax.set_aspect('equal')
-        ax.invert_xaxis()
-        return ax
+    def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.Axes:
+        return plotutility(self.df, value=value, includepts=includepts, colorbar=colorbar, cmap=cmap, ax=ax)
 
     def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r, theta and value columns.
@@ -646,19 +646,19 @@ class FaceCollection:
         U, S, VT = np.linalg.svd(harmonic_matrix, full_matrices=False)
         return U, S, VT
 
-    def extract_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str) -> np.ndarray:
+    def extract_svd_feature(self,svd_order:int,mode_num:int,valuelist:List[str],feature:str) -> np.ndarray:
         """Extract a specific feature from the SVD of the harmonic matrix for the collection of faces."""
 
         if feature not in valuelist:
             raise ValueError(f"Feature '{feature}' not found in valuelist.")
 
-        U, S, VT = self.harmonic_svd(order,valuelist=valuelist)
+        U, S, VT = self.harmonic_svd(mode_num,valuelist=valuelist)
 
-        if order >= U.shape[1]:
-            raise ValueError(f"Order {order} is out of bounds for the harmonic matrix with columns {U.shape[1]}.")
+        if svd_order >= U.shape[1]:
+            raise ValueError(f"Order {svd_order} is out of bounds for the harmonic matrix with columns {U.shape[1]}.")
 
         #Extract the correct column
-        U_order = U[:, order]
+        U_order = U[:, svd_order]
 
         #Extract the correct feature
         for idx, val in enumerate(valuelist):
@@ -685,3 +685,8 @@ class FaceCollection:
         df[feature] = columnvector
 
         return df
+
+    def plot_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str):
+
+        data = self.restack_svd_feature(self,order,mode_num,valuelist,feature)
+

@@ -434,7 +434,7 @@ class Ring:
             'y': self.df['r'] * np.sin(np.deg2rad(self.df['theta'])),
             'r': self.df['r'],
             'theta': self.df['theta'],
-            'value': harmonic_value
+            'value': np.real(harmonic_value) #This returns the real part of the harmonic value which should be real. This removes any negligible imaginary component.
         })
         return outdf
     
@@ -553,7 +553,7 @@ class Face:
                 harmonics_by_ring = pd.concat([harmonics_by_ring, ring_harmonic], ignore_index=True)
         return harmonics_by_ring
     
-    def plotHarmonic(self, order:int,value='pt', ax=None, sumorders:bool = True) -> plt.axes:
+    def plotHarmonic(self, order:int,value='pt', ax=None, sumorders:bool = False) -> plt.axes:
         """Plot either a specific harmonic or cumulative harmonics up to order."""
         outdf = self.calcHarmonic(order,value,sumorders=sumorders)
         tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
@@ -664,7 +664,7 @@ class FaceCollection:
         Each column corresponds to a face. The rows correspond to the stacked harmonic values for each value in valuelist."""
 
         #Initialize an empty numpy array
-        harmonic_matrix = np.zeros((self.feature_height * len(valuelist), self.nfaces))
+        harmonic_matrix = np.zeros((self.feature_height * len(valuelist), self.nfaces),dtype = np.complex128)
         for k,face in enumerate(self.faces):
             harmonics_dict = {}
             for value in valuelist:
@@ -718,8 +718,4 @@ class FaceCollection:
         df[feature] = columnvector
 
         return df
-
-    def plot_svd_feature(self,order:int,mode_num:int,valuelist:List[str],feature:str):
-
-        data = self.restack_svd_feature(self,order,mode_num,valuelist,feature)
 

@@ -664,11 +664,11 @@ class FaceCollection:
         Each column corresponds to a face. The rows correspond to the stacked harmonic values for each value in valuelist."""
 
         #Initialize an empty numpy array
-        harmonic_matrix = np.zeros((self.feature_height * len(valuelist), self.nfaces),dtype = np.complex128)
+        harmonic_matrix = np.zeros((self.feature_height * len(valuelist), self.nfaces))
         for k,face in enumerate(self.faces):
             harmonics_dict = {}
             for value in valuelist:
-                harmonics_dict[value] = face.calcHarmonic(order, value)['value'].to_numpy().reshape(-1,1)
+                harmonics_dict[value] = face.calcHarmonic(order, value)[value].to_numpy().reshape(-1,1)
             harmonic_matrix[:,k] = np.vstack([harmonics_dict[value] for value in valuelist]).flatten()
 
         return harmonic_matrix
@@ -709,7 +709,7 @@ class FaceCollection:
         columnvector = self.extract_svd_feature(order,mode_num,valuelist,feature)
 
         #Grab an arbitrary face dataframe from the collection, they should all be the same.
-        df = self.faces[0].df[['radius','theta']]
+        df = self.faces[0].df[['radius','theta']].copy()
 
         #Check to make sure that the rows of df match the length of the column vector
         if df.shape[0] != len(columnvector):

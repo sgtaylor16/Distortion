@@ -1,6 +1,6 @@
 
 
-from sae16 import Face, Ring
+from distortion.sae16 import Face, Ring
 from typing import List
 import numpy as np
 import pandas as pd

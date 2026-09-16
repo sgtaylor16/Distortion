@@ -10,10 +10,10 @@ from scipy.signal import resample
 def dfcheck(df:pd.DataFrame) -> bool:
     """
     Check if the dataframe has the required columns for SAE16 calculations.
-    The required columns are 'r', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
+    The required columns are 'radius', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
     'v_swirl' should be interpreted as the swirl angle.
     """
-    required_columns = ['r', 'theta', 'pt','ps']
+    required_columns = ['radius', 'theta', 'pt','ps']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"DataFrame must contain '{col}' column.")
@@ -40,10 +40,10 @@ def warn_if_theta_looks_radians(df: pd.DataFrame, tol: float = 1e-6) -> None:
 
 def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     """
-    Split inlet measurements into concentric rings by grouping nearby r values.
+    Split inlet measurements into concentric rings by grouping nearby radius values.
 
-    Rows are first ordered by r. A new ring is started whenever the current row's
-    r differs from the previous row's r by more than tolerance.
+    Rows are first ordered by radius. A new ring is started whenever the current row's
+    radius differs from the previous row's radius by more than tolerance.
     """
     if not dfcheck(data):
         raise ValueError("DataFrame does not have the required columns.")
@@ -53,13 +53,13 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     if data.empty:
         return []
 
-    sorted_data = data.sort_values(by='r').reset_index(drop=True)
+    sorted_data = data.sort_values(by='radius').reset_index(drop=True)
     rings = []
 
     start_idx = 0
-    prev_r = float(sorted_data.loc[0, 'r'])
+    prev_r = float(sorted_data.loc[0, 'radius'])
     for i in range(1, len(sorted_data)):
-        current_r = float(sorted_data.loc[i, 'r'])
+        current_r = float(sorted_data.loc[i, 'radius'])
         if abs(current_r - prev_r) > tolerance:
             ring_df = sorted_data.iloc[start_idx:i].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True)
             rings.append(ring_df)
@@ -239,12 +239,12 @@ def stack_df(df,value) -> np.ndarray:
     """
     Stack the DataFrame into a 2D array with shape (n, 1)
     where n is the number of rows in the DataFrame.
-    The DataFrame must contain 'theta', 'r', and the specified value column."""
+    The DataFrame must contain 'theta', 'radius', and the specified value column."""
 
-    #Make sure theta and r are in df columns
-    if 'theta' not in df.columns or 'r' not in df.columns or value not in df.columns:
-        raise ValueError(f"DataFrame must contain 'theta', 'r', and '{value}' columns.")
-    newdf = df[['r','theta',value]].copy().sort_values(by=['r','theta']).reset_index(drop=True)
+    #Make sure theta and radius are in df columns
+    if 'theta' not in df.columns or 'radius' not in df.columns or value not in df.columns:
+        raise ValueError(f"DataFrame must contain 'theta', 'radius', and '{value}' columns.")
+    newdf = df[['radius','theta',value]].copy().sort_values(by=['radius','theta']).reset_index(drop=True)
     return newdf[value].to_numpy().reshape(-1,1)
 
 def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
@@ -258,12 +258,12 @@ def plotutility(df: pd.DataFrame, value: str = 'pt', includepts: bool = False, c
         fig, ax = plt.subplots(figsize=(6, 6))
     else:
         fig = ax.figure
-    tris = Triangulation(df['r'] * -np.sin(np.deg2rad(df['theta'])), df['r'] * np.cos(np.deg2rad(df['theta'])))
+    tris = Triangulation(df['radius'] * -np.sin(np.deg2rad(df['theta'])), df['radius'] * np.cos(np.deg2rad(df['theta'])))
     
     contour = ax.tricontourf(tris, df[value], cmap=cmap)
     if includepts:
-        ax.plot(df['r'] * -np.sin(np.deg2rad(df['theta'])),
-                df['r'] * np.cos(np.deg2rad(df['theta'])),
+        ax.plot(df['radius'] * -np.sin(np.deg2rad(df['theta'])),
+                df['radius'] * np.cos(np.deg2rad(df['theta'])),
                 'ko', markersize=2)
     if colorbar:
         cbar = fig.colorbar(contour, ax=ax)
@@ -279,10 +279,10 @@ def rescale_columns(df:pd.DataFrame) -> Tuple[List[str],List[str]]:
     for column in df.columns:
         if (df[column].dtype != float):
             ineligable_columns.append(column)
-        if (column == 'r') or (column == 'theta'):
+        if (column == 'radius') or (column == 'theta'):
             ineligable_columns.append(column)
     eligable_columns = [x for x in df.columns if x not in ineligable_columns]
-    ineligable_columns = [x for x in ineligable_columns if x not in ['r','theta']]
+    ineligable_columns = [x for x in ineligable_columns if x not in ['radius','theta']]
 
     return eligable_columns,ineligable_columns
     
@@ -324,12 +324,13 @@ class SwirlSegment(Segment):
 
 class Ring:
     def __init__(self,df:pd.DataFrame):
-        """The dataframe should have columns 'r', 'theta', and 'pt',"""
+        """The dataframe should have columns 'radius', 'theta', and 'pt',"""
 
         dfcheck(df)
 
         self.df = df
-        self.r = df['r'].mean()
+        self.radius = df['radius'].mean()
+        self.r = self.radius
 
         # Find Pressure Segments
         self.pavg = self.df['pt'].mean()
@@ -430,9 +431,9 @@ class Ring:
         selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
         harmonic_value = ifft(selected_fft)
         outdf = pd.DataFrame({
-            'x': self.df['r'] * np.cos(np.deg2rad(self.df['theta'])),
-            'y': self.df['r'] * np.sin(np.deg2rad(self.df['theta'])),
-            'r': self.df['r'],
+            'x': self.df['radius'] * np.cos(np.deg2rad(self.df['theta'])),
+            'y': self.df['radius'] * np.sin(np.deg2rad(self.df['theta'])),
+            'radius': self.df['radius'],
             'theta': self.df['theta'],
             'value': np.real(harmonic_value) #This returns the real part of the harmonic value which should be real. This removes any negligible imaginary component.
         })
@@ -442,10 +443,10 @@ class Ring:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
         resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
-        resampled_r = np.full(n, self.df['r'].iloc[0]) #Assumes r is constant within the ring
-        other_columns = [col for col in self.df.columns if col not in ['r', 'theta']]
+        resampled_radius = np.full(n, self.df['radius'].iloc[0]) #Assumes radius is constant within the ring
+        other_columns = [col for col in self.df.columns if col not in ['radius', 'theta']]
         resampled_df = pd.DataFrame({
-            'r': resampled_r,
+            'radius': resampled_radius,
             'theta': resampled_theta
         })
         # Group the columns into ones that should be interpolated and those that shouldn't.
@@ -478,7 +479,7 @@ class Ring:
 
 class Face:
     """Class that represents the rings that make up a face and calculates the SAE16 Intensity metric for the face.
-    The df expects the following columns: 'r', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
+    The df expects the following columns: 'radius', 'theta', 'pt', 'ps', 'v_swirl', and 'v_axial'.
     theta should be in degrees and should be in the range [0, 360).
     """
 
@@ -492,7 +493,7 @@ class Face:
         # Calculate incidence
         dfcheck(datadf)
         #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
-        datadf = datadf.sort_values(by=['r','theta']).reset_index(drop=True)
+        datadf = datadf.sort_values(by=['radius','theta']).reset_index(drop=True)
         datadf['incidence'] = np.arctan2(datadf['v_swirl'],datadf['v_axial']) * 180 / np.pi
 
         integer_columns = datadf.select_dtypes(include=["integer"]).columns
@@ -542,8 +543,8 @@ class Face:
         return plotutility(self.df, value=value, includepts=includepts, colorbar=colorbar, cmap=cmap, ax=ax)
 
     def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
-        """Calculates the harmonic of a specific order for each ring and returns a DataFrame with r, theta and value columns.
-        The dataframe is ordered by r's first, at each r the theta's are walked through.
+        """Calculates the harmonic of a specific order for each ring and returns a DataFrame with radius, theta and value columns.
+        The dataframe is ordered by radius's first, at each radius the theta's are walked through.
         """
         for i,ring in enumerate(self.rings):
             ring_harmonic = ring.calcHarmonic(order=order,value=value,sumorders= sumorders)
@@ -575,12 +576,12 @@ class Face:
         
     def resample_r(self,r_n: int) -> 'Face':
         """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data."""
-        outer_radius = self.df['r'].max()
-        inner_radius = self.df['r'].min()
+        outer_radius = self.df['radius'].max()
+        inner_radius = self.df['radius'].min()
         center_radii = centers_of_equal_area(outer_radius, inner_radius, r_n)
 
-        sorted_rings = sorted(self.rings, key=lambda ring: ring.df['r'].iloc[0])
-        ring_radii = np.array([ring.df['r'].iloc[0] for ring in sorted_rings])
+        sorted_rings = sorted(self.rings, key=lambda ring: ring.df['radius'].iloc[0])
+        ring_radii = np.array([ring.df['radius'].iloc[0] for ring in sorted_rings])
 
         resampled_rings = []
         for center_r in center_radii:
@@ -588,9 +589,9 @@ class Face:
             idx_below = idx_above - 1
 
             if idx_below < 0:
-                resampled_rings.append(sorted_rings[0].df.assign(r=center_r))
+                resampled_rings.append(sorted_rings[0].df.assign(radius=center_r))
             elif idx_above >= len(sorted_rings):
-                resampled_rings.append(sorted_rings[-1].df.assign(r=center_r))
+                resampled_rings.append(sorted_rings[-1].df.assign(radius=center_r))
             else:
                 ring_below = sorted_rings[idx_below]
                 ring_above = sorted_rings[idx_above]
@@ -613,7 +614,7 @@ class Face:
                     dfdict[onecolumn] = len(thetas) * [self.df[onecolumn][0]]
 
                 dfdict['theta'] = thetas
-                dfdict['r'] = len(thetas) *[center_r]
+                dfdict['radius'] = len(thetas) * [center_r]
 
                 resampled_rings.append(pd.DataFrame(dfdict))
 
@@ -636,7 +637,7 @@ class Face:
         """
         Plots the magnitude of the fourier transform for each order, by radius
         """
-        radiuslist = [x.r for x in self.rings]
+        radiuslist = [x.radius for x in self.rings]
         fftlist = [abs(x.ringfft(maxorder,value,True)) for x in self.rings]
 
         fig,ax = plt.subplots()

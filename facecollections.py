@@ -36,6 +36,10 @@ class FaceCollection:
     def harmonic_svd(self,order:int,valuelist:List[str]) -> tuple[np.ndarray,np.ndarray,np.ndarray]:
         """Calculate the SVD of the harmonic matrix for the collection of faces."""
         harmonic_matrix = self.harmonic_matrix(order,valuelist)
+
+        #Subtract mean 
+        harmonic_matrix -= np.mean(harmonic_matrix, axis=1, keepdims=True)
+
         U, S, VT = np.linalg.svd(harmonic_matrix, full_matrices=False)
         return U, S, VT
 

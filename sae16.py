@@ -435,7 +435,7 @@ class Ring:
             'y': self.df['radius'] * np.sin(np.deg2rad(self.df['theta'])),
             'radius': self.df['radius'],
             'theta': self.df['theta'],
-            'value': np.real(harmonic_value) #This returns the real part of the harmonic value which should be real. This removes any negligible imaginary component.
+            value: np.real(harmonic_value) #This returns the real part of the harmonic value which should be real. This removes any negligible imaginary component.
         })
         return outdf
     
@@ -492,6 +492,7 @@ class Face:
             datadf['v_axial'] = 0.0
         # Calculate incidence
         dfcheck(datadf)
+        datadf['radius'] = datadf['radius'].round(4)
         #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
         datadf = datadf.sort_values(by=['radius','theta']).reset_index(drop=True)
         datadf['incidence'] = np.arctan2(datadf['v_swirl'],datadf['v_axial']) * 180 / np.pi

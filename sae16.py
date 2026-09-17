@@ -442,9 +442,7 @@ class Ring:
     def resample_df(self, n:int) -> pd.DataFrame:
         """Uses Scipy.signal's resample function to resample the ring data to n points."""
         resampled_theta = np.linspace(0, 360, n, endpoint=False)
-        resampled_theta = np.array([(x+180)%360 for x in resampled_theta]) #Shift theta by 180 degrees
         resampled_radius = np.full(n, self.df['radius'].iloc[0]) #Assumes radius is constant within the ring
-        other_columns = [col for col in self.df.columns if col not in ['radius', 'theta']]
         resampled_df = pd.DataFrame({
             'radius': resampled_radius,
             'theta': resampled_theta

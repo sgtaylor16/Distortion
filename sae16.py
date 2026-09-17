@@ -543,6 +543,22 @@ class Face:
     def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.Axes:
         return plotutility(self.df, value=value, includepts=includepts, colorbar=colorbar, cmap=cmap, ax=ax)
 
+    def plot_velocity(self, value='pt', colorbar:bool=False, cmap:str='viridis', ax=None, scale=None, quiver_color:str='k') -> plt.Axes:
+        """Plots pressure contours with the in-plane velocity (v_radial, v_swirl) overlaid as quiver arrows."""
+        ax = self.plotFace(value=value, includepts=False, colorbar=colorbar, cmap=cmap, ax=ax)
+
+        theta_rad = np.deg2rad(self.df['theta'])
+        x = self.df['radius'] * -np.sin(theta_rad)
+        y = self.df['radius'] * np.cos(theta_rad)
+
+        v_radial = self.df['v_radial'] if 'v_radial' in self.df.columns else 0.0
+        v_swirl = self.df['v_swirl']
+        vx = v_radial * -np.sin(theta_rad) + v_swirl * -np.cos(theta_rad)
+        vy = v_radial * np.cos(theta_rad) + v_swirl * -np.sin(theta_rad)
+
+        ax.quiver(x, y, vx, vy, color=quiver_color, scale=scale)
+        return ax
+
     def calcHarmonic(self,order:int,value = 'pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for each ring and returns a DataFrame with radius, theta and value columns.
         The dataframe is ordered by radius's first, at each radius the theta's are walked through.
@@ -561,7 +577,7 @@ class Face:
         tris = Triangulation(-outdf['y'], outdf['x'])  # Rotate the points so that 0 degrees is at the top of the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
-        ax.tricontourf(tris, outdf['value'])
+        ax.tricontourf(tris, outdf[value])
         ax.set_aspect('equal')
         ax.invert_xaxis()
         return ax

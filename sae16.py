@@ -420,7 +420,7 @@ class Ring:
     
     def fft(self,value:str='pt') -> np.ndarray:
         p = self.df[value].to_numpy()
-        return fft(p)
+        return fft(p,normalize='forward') #To conform to SAE16 calculation
 
     def ringfft(self,order:int,value:str='pt',sumorders:bool=False):
         fft_values = self.fft(value)
@@ -429,7 +429,7 @@ class Ring:
     def calcHarmonic(self,order:int,value:str='pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
         selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
-        harmonic_value = ifft(selected_fft)
+        harmonic_value = ifft(selected_fft,normalize='forward') #To conform to SAE16 calculation
         outdf = pd.DataFrame({
             'x': self.df['radius'] * np.cos(np.deg2rad(self.df['theta'])),
             'y': self.df['radius'] * np.sin(np.deg2rad(self.df['theta'])),

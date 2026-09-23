@@ -429,7 +429,7 @@ class Ring:
     def calcHarmonic(self,order:int,value:str='pt',sumorders:bool=False) -> pd.DataFrame:
         """Calculates the harmonic of a specific order for the ring and returns a DataFrame with x, y, and value columns."""
         selected_fft = self.ringfft(order=order,value=value,sumorders=sumorders)
-        harmonic_value = ifft(selected_fft,normalize='forward') #To conform to SAE16 calculation
+        harmonic_value = ifft(selected_fft,norm='forward') #To conform to SAE16 calculation
         outdf = pd.DataFrame({
             'x': self.df['radius'] * np.cos(np.deg2rad(self.df['theta'])),
             'y': self.df['radius'] * np.sin(np.deg2rad(self.df['theta'])),

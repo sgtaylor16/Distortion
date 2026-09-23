@@ -589,10 +589,14 @@ class Face:
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)
         
-    def resample_r(self,r_n: int) -> 'Face':
-        """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data."""
-        outer_radius = self.df['radius'].max()
-        inner_radius = self.df['radius'].min()
+    def resample_r(self,r_n: int,inner_radius: None | float = None,outer_radius: None | float = None) -> 'Face':
+        """Resample the rings to r_n rings with equal area and return a new Face object with the resampled data. If 
+        outer_radius is not specified, it defaults to the maximum radius in the current Face object.
+        """
+        if outer_radius is None:
+            outer_radius = self.df['radius'].max()
+        if inner_radius is None:
+            inner_radius = self.df['radius'].min()
         center_radii = centers_of_equal_area(outer_radius, inner_radius, r_n)
 
         sorted_rings = sorted(self.rings, key=lambda ring: ring.df['radius'].iloc[0])

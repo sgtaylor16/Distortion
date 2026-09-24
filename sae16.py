@@ -420,7 +420,7 @@ class Ring:
     
     def fft(self,value:str='pt') -> np.ndarray:
         p = self.df[value].to_numpy()
-        return fft(p,normalize='forward') #To conform to SAE16 calculation
+        return fft(p,norm='forward') #To conform to SAE16 calculation
 
     def ringfft(self,order:int,value:str='pt',sumorders:bool=False):
         fft_values = self.fft(value)

@@ -640,9 +640,9 @@ class Face:
         resampled_data = pd.concat(resampled_rings, ignore_index=True)
         return Face(resampled_data, critangle=self.critangle)
     
-    def resample(self, r_n: int, theta_n: int) -> 'Face':
+    def resample(self, r_n: int, theta_n: int,inner_radius: None | float = None,outer_radius: None | float = None) -> 'Face':
         """Resample the face to r_n rings and theta_n points per ring, returning a new Face object with the resampled data."""
-        return self.resample_r(r_n).resample_theta(theta_n)
+        return self.resample_r(r_n,inner_radius=inner_radius,outer_radius=outer_radius).resample_theta(theta_n)
 
     def stacks(self,valuelist:list[str]) -> np.ndarray:
         """Stack the specified values from the face's dataframe into a 2D array."""

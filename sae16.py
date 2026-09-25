@@ -504,6 +504,14 @@ class Face:
         self.critangle = critangle
         self.Q = self.df['pt'].mean() - self.df['ps'].mean()
 
+    def giverakedetails(self):
+        """Provides rake radiii and rake resolution"""
+        radii = [ring.radius for ring in self.rings]
+        nradii = len(radii)
+        ntheta = len(self.df['theta'].unique())
+        print(f"Rake radii: {radii}")
+        print(f"Rake Resolution (rxtheta) = {nradii} x {ntheta}")
+        
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
 

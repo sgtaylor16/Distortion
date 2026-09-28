@@ -254,6 +254,29 @@ def stack_stacks(df,valuelist:List[str]) -> np.ndarray:
     return np.vstack([stack_df(df, value) for value in valuelist])
 
 def plotutility(df: pd.DataFrame, value: str = 'pt', includepts: bool = False, colorbar: bool = False, cmap: str = 'viridis', ax: plt.Axes = None) -> plt.Axes:
+    """
+    Utility function to plot a polar contour plot of the specified value from the DataFrame.
+    Theta = 0 corresponds to the positive y-axis in the plot. 
+
+    THe plot axis is as follows:
+
+    ^ z
+    |
+    |
+    +----> x
+    
+
+    Parameters:
+    df (pd.DataFrame): DataFrame containing 'theta', 'radius', and the value column.
+    value (str): Column name of the value to plot.
+    includepts (bool): Whether to include the data points on the plot.
+    colorbar (bool): Whether to include a colorbar.
+    cmap (str): Colormap to use for the contour plot.
+    ax (plt.Axes): Matplotlib Axes object to plot on. If None, a new figure and axes are created.
+
+    Returns:
+    plt.Axes: The Axes object with the plot.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     else:

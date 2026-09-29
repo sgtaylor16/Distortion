@@ -559,14 +559,16 @@ class Face:
         rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
         return max(rings_swirlintensity)
     
-    def HEI(self,ring:int,value='pt',normalize:bool=True) -> List[float]:
+    def HEI(self,ring:int,value='pt',normalize:bool=True) -> np.ndarray:
         """Calculates the Harmonic Energy Index for a specific ring."""
         fft_values = self.rings[ring].fft(value)
         q = self.df['pt'].mean() - self.df['ps'].mean()
         if normalize:
-            HEI_values = [np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)]
+            #Multiplying fft values by 2 to align with SAE16 standard
+            HEI_values = 2 * np.array([np.abs(fft_values[n]) / q for n in range(1, len(fft_values)//2)])
         else:
-            HEI_values = [np.abs(fft_values[n]) for n in range(1, len(fft_values)//2)]
+            #Multiplying fft values by 2 to align with SAE16 standard
+            HEI_values = 2* np.array([np.abs(fft_values[n]) for n in range(1, len(fft_values)//2)])
         return HEI_values
 
     def plotFace(self, value='pt', includepts:bool=False, colorbar:bool=False, cmap:str='viridis', ax=None) -> plt.Axes:

@@ -531,7 +531,7 @@ class Face:
         """Provides rake radiii and rake resolution"""
         radii = [ring.radius for ring in self.rings]
         nradii = len(radii)
-        ntheta = len(self.df['theta'].unique())
+        ntheta = len(self.rings[0].df['theta'].unique()) #Assumes all rings have the same number of theta divisions
         print(f"Rake radii: {radii}")
         print(f"Rake Resolution (rxtheta) = {nradii} x {ntheta}")
         

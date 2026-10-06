@@ -511,13 +511,15 @@ class Face:
             datadf['v_swirl'] = 0.0
         if 'v_axial' not in datadf.columns:
             datadf['v_axial'] = 0.0
-        # Calculate incidence
+        # Calculate swirl angle
         dfcheck(datadf)
         datadf['radius'] = datadf['radius'].round(4)
+
         #Sort the columns in the matrix in a specifc order to facilitate reshaping column vectors.
         datadf = datadf.sort_values(by=['radius','theta']).reset_index(drop=True)
         datadf['incidence'] = np.arctan2(datadf['v_swirl'],datadf['v_axial']) * 180 / np.pi
 
+        #Convert integer columns to float to avoid potential issues with calculations
         integer_columns = datadf.select_dtypes(include=["integer"]).columns
         datadf[integer_columns] = datadf[integer_columns].astype(float)
 
@@ -538,28 +540,33 @@ class Face:
     def PFAV(self) -> float:
         return np.mean([ring.PAV() for ring in self.rings])
 
-    def RDI(self,i) -> float:
+    def RDI(self,i:int) -> float:
+        """Calculates the Radial Distortion at ring index i."""
         return (self.PFAV() - self.rings[i].PAV()) / self.PFAV()
     
     def RDImax(self) -> float:
+        """Calculates the maximum Radial Distortion Index among all rings."""
         rings_RDI = [self.RDI(i) for i in range(len(self.rings))]
         return max(rings_RDI)
     
-    def CDI(self,i) -> float:
+    def CDI(self,i:int) -> float:
+        """Calculates the Circumferential Distortion Index for ring index i."""
         return self.rings[i].CDI(self.critangle)
     
     def CDImax(self) -> float:
         rings_CDI = [self.CDI(i) for i in range(len(self.rings))]
         return max(rings_CDI)
 
-    def swirlintensity(self,i) -> float:
+    def swirlintensity(self,i:int) -> float:
+        """Calculates the swirl intensity for ring index i."""
         return self.rings[i].swirlintensity()
 
-    def swirlintesitymax(self) -> float:
+    def swirlintensitymax(self) -> float:
+        """Calculates the maximum swirl intensity among all rings."""
         rings_swirlintensity = [self.swirlintensity(i) for i in range(len(self.rings))]
         return max(rings_swirlintensity)
     
-    def HEI(self,ring:int,value='pt',normalize:bool=True) -> np.ndarray:
+    def HEI(self,ring:int,value:str='pt',normalize:bool=True) -> np.ndarray:
         """Calculates the Harmonic Energy Index for a specific ring."""
         fft_values = self.rings[ring].fft(value)
         q = self.df['pt'].mean() - self.df['ps'].mean()

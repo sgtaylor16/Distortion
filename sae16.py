@@ -478,6 +478,9 @@ class Ring:
         #Leave unchange the constant columns
         for col in constant_columns:
             resampled_df[col] = self.df[col][0]
+
+        # Rotate the data by 90 degrees to align the theta values with the expected reference orientation
+        resampled_df['theta'] = (resampled_df['theta'] + 90) % 360
         return resampled_df
     
     def swirlintensity(self) -> float:

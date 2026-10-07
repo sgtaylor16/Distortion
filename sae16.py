@@ -74,18 +74,24 @@ def findzero_crossing(data: pd.DataFrame, avg: float, value: str = 'pt') -> List
     theta = data['theta'].to_numpy(dtype=float)
     y = data[value].to_numpy(dtype=float) - avg
 
+    if theta.size == 0:
+        return []
+
     x0 = theta
     x1 = np.roll(theta, -1)
-    x1[-1] += 360          # wrap-around segment
+    x1[-1] += 360
     y0 = y
     y1 = np.roll(y, -1)
 
-    mask = y0 * y1 <= 0    # original skipped only when product > 0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        zc = x0 - y0 * (x1 - x0) / (y1 - y0)
+    mask = (y0 * y1 <= 0) & (y0 != y1)
+    crossing_indices = np.flatnonzero(mask)
+    crossings = x0[crossing_indices] - y0[crossing_indices] * (
+        x1[crossing_indices] - x0[crossing_indices]
+    ) / (y1[crossing_indices] - y0[crossing_indices])
 
-    zc[-1] %= 360          # only the wrap-around crossing is wrapped
-    return zc[mask].tolist()
+    if crossing_indices.size and crossing_indices[-1] == theta.size - 1:
+        crossings[-1] %= 360
+    return crossings.tolist()
 
 def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     """

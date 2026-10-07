@@ -650,6 +650,7 @@ class Face:
             idx_above = np.searchsorted(ring_radii, center_r, side='right')
             idx_below = idx_above - 1
 
+            #Look for the rings immediately below and above the target center radius to interpolate between them
             if idx_below < 0:
                 resampled_rings.append(sorted_rings[0].df.assign(radius=center_r))
             elif idx_above >= len(sorted_rings):
@@ -666,6 +667,7 @@ class Face:
                 fit_columns,constant_columns = rescale_columns(self.df)
 
                 dfdict={}
+                # Interpolate the values for each column based on the relative position of the target center radius between the rings below and above
                 for onecolumn in fit_columns:
                     values_below = ring_below.df[onecolumn].values
                     values_above = ring_above.df[onecolumn].values

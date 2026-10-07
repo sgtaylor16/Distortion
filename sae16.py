@@ -70,35 +70,22 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     rings.append(sorted_data.iloc[start_idx:].copy().reset_index(drop=True).sort_values(by='theta').reset_index(drop=True))
     return rings
 
-def findzero_crossing(data:pd.DataFrame,avg:float,value:str='pt') -> List[float]:
-    """
-    Find the points where the data crosses zero. Interpolates between points to find the exact
-    crossing point. Assumes that the data is ordered by 'theta' and that 'pt' is the value being analyzed for crossings with respect to pavg.
-    """
-    zerocrossings = []
-    for i in range(len(data) - 1):
-        x0 = data.loc[i, 'theta']
-        x1 = data.loc[i+1, 'theta']
-        y0 = data.loc[i, value] - avg
-        y1 = data.loc[i+1, value] - avg
-        if y0 * y1 > 0:
-        # No zero crossing
-            continue
-        else:
-        # Linear interpolation to find the exact zero crossing
-            zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
-            zerocrossings.append(zero_crossing)
+def findzero_crossing(data: pd.DataFrame, avg: float, value: str = 'pt') -> List[float]:
+    theta = data['theta'].to_numpy(dtype=float)
+    y = data[value].to_numpy(dtype=float) - avg
 
-    #Check the edge case for wrap-around crossing between the last and first points
-    x0 = data.loc[len(data) - 1, 'theta']
-    x1 = data.loc[0, 'theta'] + 360 # Add wrap-around
-    y0 = data.loc[len(data) - 1, value] - avg
-    y1 = data.loc[0, value] - avg
-    if y0 * y1 <= 0:
-        zero_crossing = x0 - y0 * (x1 - x0) / (y1 - y0)
-        zero_crossing = zero_crossing % (360) # Wrap back to [0, 360]
-        zerocrossings.append(zero_crossing)
-    return zerocrossings
+    x0 = theta
+    x1 = np.roll(theta, -1)
+    x1[-1] += 360          # wrap-around segment
+    y0 = y
+    y1 = np.roll(y, -1)
+
+    mask = y0 * y1 <= 0    # original skipped only when product > 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        zc = x0 - y0 * (x1 - x0) / (y1 - y0)
+
+    zc[-1] %= 360          # only the wrap-around crossing is wrapped
+    return zc[mask].tolist()
 
 def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     """

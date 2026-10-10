@@ -71,6 +71,16 @@ def findrings(data:pd.DataFrame,tolerance=0.05) -> List[pd.DataFrame]:
     return rings
 
 def findzero_crossing(data: pd.DataFrame, avg: float, value: str = 'pt') -> List[float]:
+    """Find the theta values where the data crosses the average value.
+
+    Args:
+        data (pd.DataFrame): DataFrame containing 'theta' and the specified value column.
+        avg (float): The average value to find crossings for.
+        value (str): The column name in the DataFrame to check for crossings.
+
+    Returns:
+        List[float]: List of theta values where the data crosses the average value.
+    """
     theta = data['theta'].to_numpy(dtype=float)
     y = data[value].to_numpy(dtype=float) - avg
 
@@ -95,7 +105,16 @@ def findzero_crossing(data: pd.DataFrame, avg: float, value: str = 'pt') -> List
 
 def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
     """
-    Find the segments of the data where value is all above or all below the avg value"""
+    Find the segments of the data where value is all above or all below the avg value
+    
+    Args:
+        data (pd.DataFrame): DataFrame containing 'theta' and the specified value column.
+        avg (float): The average value to find segments for.
+        value (str): The column name in the DataFrame to check for segments.
+
+    Returns:
+        List[pd.DataFrame]: List of DataFrames, each representing a segment where the value is consistently above or below the average.
+    """
     segments = []
     zero_crossings = findzero_crossing(data,avg,value)
     if len(zero_crossings) < 2:
@@ -129,6 +148,14 @@ def find_segments(data:pd.DataFrame,avg,value:str='pt') -> List[pd.DataFrame]:
 def findnegative_segments(data:pd.DataFrame,avg:float,value:str='pt') -> List[pd.DataFrame]:
     """
     Find the segments of the data where p is below the average value.
+
+    Args:
+        data (pd.DataFrame): The input dataframe containing the data.
+        avg (float): The average value to compare against.
+        value (str): The column name in the dataframe to check against the average.
+
+    Returns:
+        List[pd.DataFrame]: A list of dataframes where the specified column's mean is below the average.
     """
 
     allsegments = find_segments(data,avg,value)
@@ -139,6 +166,14 @@ def area_bar(segment:pd.DataFrame,avg:float,value:str='pt') -> float:
     """
     Calculate the area of the segment below pavg using the trapezoidal rule.
     Assumes that the segment is ordered by 'theta'.
+
+    Args:
+        segment (pd.DataFrame): The segment of data to calculate the area for.
+        avg (float): The average value to compare against.
+        value (str): The column name in the dataframe to check against the average.
+
+    Returns:
+        float: The area of the segment below the average value.
     """
     if segment.empty:
         return 0.0
@@ -154,10 +189,18 @@ def proximity_test(segment1, segment2, critangle:float) -> bool:
     else:
         return False
     
-def orderselect(fft,order,sumorders:bool=False) -> np.ndarray:
+def orderselect(fft:np.ndarray,order:int,sumorders:bool=False) -> np.ndarray:
     """
     Selects the specified order from the FFT result.
     if sumorders is True, selects all orders up to and including the specified order.
+
+    Args:
+        fft (np.ndarray): The FFT result array.
+        order (int): The order to select from the FFT result.
+        sumorders (bool): If True, selects all orders up to and including the specified order.
+
+    Returns:
+        np.ndarray: The reduced FFT array containing only the selected order(s).
     """
     #Check to make sure order is under n/2
     if order >= len(fft) // 2:

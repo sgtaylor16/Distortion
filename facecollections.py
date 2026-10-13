@@ -38,7 +38,7 @@ class FaceCollection:
         harmonic_matrix = self.harmonic_matrix(order,valuelist)
 
         #Subtract mean 
-        harmonic_matrix -= np.mean(harmonic_matrix, axis=1, keepdims=True)
+        harmonic_matrix = harmonic_matrix - np.tile(np.mean(harmonic_matrix, axis=1, keepdims=True), (1, harmonic_matrix.shape[1]))
 
         U, S, VT = np.linalg.svd(harmonic_matrix, full_matrices=False)
         return U, S, VT

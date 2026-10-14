@@ -4,6 +4,7 @@ from distortion.sae16 import Face, Ring
 from typing import List
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 class FaceCollection:
 
@@ -82,4 +83,21 @@ class FaceCollection:
         df[feature] = columnvector
 
         return df
+
+    def plot_collection(self,value='pt',ncols:int=4) -> plt.Figure:
+        """Plot every face in the collection on a grid, ncols faces across."""
+        nrows = int(np.ceil(self.nfaces / ncols))
+        fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3 * nrows), squeeze=False)
+        flat_axes = axes.ravel()
+
+        for k, face in enumerate(self.faces):
+            face.plotFace(value=value, includepts=False, colorbar=False, ax=flat_axes[k])
+            if self.conditionlist is not None:
+                flat_axes[k].set_title(str(self.conditionlist[k]), fontsize=8)
+
+        for ax in flat_axes[self.nfaces:]:
+            ax.axis('off')
+
+        fig.tight_layout()
+        return fig
 

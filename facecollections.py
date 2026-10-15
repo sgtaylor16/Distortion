@@ -1,5 +1,3 @@
-
-
 from distortion.sae16 import Face, Ring
 from typing import List
 import numpy as np
@@ -100,4 +98,3 @@ class FaceCollection:
 
         fig.tight_layout()
         return fig
-

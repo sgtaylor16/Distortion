@@ -27,7 +27,9 @@ class FaceCollection:
         for k,face in enumerate(self.faces):
             harmonics_dict = {}
             for value in valuelist:
-                harmonics_dict[value] = face.calcHarmonic(order, value)[value].to_numpy().reshape(-1,1,order='F')
+                #Create a new face with the mean subtracted.
+                newface = Face(face.df.copy() - face.df[value].mean())
+                harmonics_dict[value] = newface.calcHarmonic(order, value)[value].to_numpy().reshape(-1,1,order='F')
             harmonic_matrix[:,k] = np.vstack([harmonics_dict[value] for value in valuelist]).flatten()
 
         return harmonic_matrix
